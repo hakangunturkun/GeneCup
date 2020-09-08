@@ -3,8 +3,9 @@ from nltk.tokenize import sent_tokenize
 import os
 import re
 from ratspub_keywords import *
+from gene_synonyms import *
 
-global function_d, brain_d, drug_d, addiction_d, brain_query_term, pubmed_path
+global function_d, brain_d, drug_d, addiction_d, brain_query_term, pubmed_path, genes
 
 ## turn dictionary (synonyms) to regular expression
 def undic(dic):
@@ -141,6 +142,8 @@ function=undic(function_d)
 addiction=undic(addiction_d)
 drug=undic(drug_d)
 
+gene_s=undic(genes)
+
 nodecolor={'function':"#A9CCE3", 'addiction': "#D7BDE2", 'drug': "#F9E79F", 'brain':"#A3E4D7", 'GWAS':"#AEB6BF", 'stress':"#EDBB99", 'psychiatric':"#F5B7B1"}
 #https://htmlcolorcodes.com/ third column down
 
@@ -150,7 +153,7 @@ n2=generate_nodes(drug_d, 'drug')
 n3=generate_nodes(brain_d, 'brain')
 n4=generate_nodes(stress_d, 'stress')
 n5=generate_nodes(psychiatric_d, 'psychiatric')
-n6=generate_nodes(psychiatric_d, 'GWAS')
+n6=''
 
 nj0=generate_nodes_json(function_d, 'function')
 nj1=generate_nodes_json(addiction_d, 'addiction')
@@ -158,23 +161,7 @@ nj2=generate_nodes_json(drug_d, 'drug')
 nj3=generate_nodes_json(brain_d, 'brain')
 nj4=generate_nodes_json(stress_d, 'stress')
 nj5=generate_nodes_json(psychiatric_d, 'psychiatric')
-nj6=generate_nodes_json(psychiatric_d, 'GWAS')
-
-
+nj6=''
 
 pubmed_path=os.environ["EDIRECT_PUBMED_MASTER"]
-if ( not pubmed_path): 
-    pubmed_path="~/Dropbox/ChenLab/Hakan/RatsPub/PubMed"
-pubmed_path +="/Archive"
-'''
-print (pubmed_path)
-host= os.popen('hostname').read().strip()
-if host=="x1":
-    pubmed_path="/run/media/hao/PubMed/Archive/"
-elif host=="hchen3":
-    pubmed_path="/media/hao/2d554499-6c5b-462d-85f3-5c49b25f4ac8/PubMed/Archive"
-elif host=="penguin2":
-    pubmed_path="/export2/PubMed/Archive"
-elif host=="hchen":
-    pubmed_path="~/Dropbox/ChenLab/Hakan/RatsPub/PubMed/Archive"
-'''
+

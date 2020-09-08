@@ -1,45 +1,43 @@
-addiction_d = {"reward":"reward|hedonic|incentive|intracranial self stimulation|ICSS|reinforcement|reinforcing|conditioned place preference|CPP|self administration|self administered|drug reinforced|operant|instrumental response",
-        "aversion":"aversion|aversive|CTA|conditioned taste aversion",
-        "withdrawal":"withdrawal",
-        "relapse":"relapse|reinstatement|craving|drug seeking|seeking",
-        "sensitization":"sensitization",
-        "addiction":"addiction|addictive|drug abuse|punishment|compulsive|escalation",
-        "dependence":"dependence",
-        "intoxication":"intoxication|binge"
-        }
-drug_d = {"alcohol":"alcohol|alcoholism|alcoholic|alcoholics",
-        "nicotine":"smoking|nicotine|tobacco|smoker|smokers",
-        "cocaine":"cocaine",
-        "opioid":"opioid|opioids|fentanyl|oxycodone|oxycontin|heroin|morphine|methadone|buprenorphine|vicodin|hydrocodone|hycodan|kadian|percoset|hydromorphone|naloxone|codeine|suboxone|tramadol|kratom|ultram",
-        "amphetamine":"methamphetamine|amphetamine|METH|AMPH",
-        "cannabinoid":"endocannabinoid|cannabinoids|cannabis|endocannabinoids|marijuana|cannabidiol|cannabinoid|tetrahydrocannabinol|thc|thc 9|Oleoylethanolamide|palmitoylethanolamide|acylethanolamides"
-        }
-brain_d ={"cortex":"cortex|prefrontal|pfc|mPFC|vmpfc|corticostriatal|cortico limbic|corticolimbic|prl|prelimbic|infralimbic|orbitofrontal|cingulate|cerebral|insular|insula",
-          "striatum":"striatum|STR|striatal|caudate|putamen|basal ganglia|globus pallidus|GPI",
-          "accumbens":"accumbens|accumbal|shell|core|Nacc|NacSh|acbs|acbc",
-          "hippocampus":"hippocampus|hippocampal|hipp|hip|ca1|ca3|dentate gyrus|subiculum|vhipp|dhpc|vhpc",
-          "amygdala":"amygdala|cea|bla|amy|cna",
-          "VTA":"ventral tegmental|vta|pvta|mesolimbic|limbic|midbrain|mesoaccumbens|mesoaccumbal",
-          "habenula":"habenula|lhb|mhb",
-          "hypothalamus":"hypothalamus|hypothalamic|PVN|paraventricular nucleus|LHA"
-          }
-# brain region has too many short acronyms to just use the undic function, so search PubMed using the following 
-brain_query_term="cortex|accumbens|striatum|amygadala|hippocampus|tegmental|mesolimbic|infralimbic|prelimbic|habenula"
-function_d={"signalling":"signalling|signaling|phosphorylation|glycosylation",
-            "transcription":"transcription|methylation|hypomethylation|hypermethylation|histone|ribosome",
-            "neuroplasticity":"neuroplasticity|plasticity|long term potentiation|LTP|long term depression|LTD|synaptic|epsp|epsc|neurite|neurogenesis|boutons|mIPSC|IPSC|IPSP",
-            "neurotransmission": "neurotransmission|neuropeptides|neuropeptide|glutamate|glutamatergic|GABA|GABAergic|dopamine|dopaminergic|DAergic|cholinergic|nicotinic|muscarinic|serotonergic|serotonin|5 ht|acetylcholine",
-            }
-#"regulation":"increased|decreased|regulated|inhibited|stimulated",
+addiction_d={'addiction':'addiction|addictive|compulsive|drug-abuse|escalation|punishment',
+'aversion':'aversion|aversive|conditioned-taste-aversion|CTA',
+'dependence':'dependence',
+'intoxication':'binge|intoxication',
+'relapse':'craving|drug-seeking|reinstatement|relapse|seeking',
+'reward':'conditioned-place-preference|CPP|drug-reinforced|hedonic|ICSS|incentive|instrumental-response|intracranial-self-stimulation|operant|reinforcement|reinforcing|reward|self-administered|self-administration',
+'sensitization':'sensitization',
+'withdrawal':'withdrawal'}
 
-stress_d={"stress":"stress|psycological trauma|distress",
-          "PTSD":"PTSD"
-         }
-psychiatric_d={"anxiety":"anxiety|anxious",
-               "depression":"depression|depressive",
-               "bipolar":"bipolar disorder",
-               "impulsivity":"impulsivity|impulsive",
-               "compulsive":"compulsive|obssessive",
-               "schizophrenia": "schizophrenia",
-               "autism": "autism|autistic"
-               }
+brain_d={'accumbens':'acbc|acbs|accumbal|accumbens|core|Nacc|NacSh|shell',
+'amygdala':'amy|amygdala|bla|cea|cna',
+'cortex':'cerebral|cingulate|cortex|cortico-limbic|corticolimbic|corticostriatal|infralimbic|insula|insular|mPFC|orbitofrontal|pfc|prefrontal|prelimbic|prl|vmpfc',
+'habenula':'habenula|lhb|mhb',
+'hippocampus':'ca1|ca3|dentate-gyrus|dhpc|hip|hipp|hippocampal|hippocampus|subiculum|vhipp|vhpc',
+'hypothalamus':'hypothalamic|hypothalamus|LHA|paraventricular-nucleus|PVN',
+'striatum':'basal-ganglia|caudate|globus-pallidus|GPI|putamen|STR|striatal|striatum',
+'VTA':'limbic|mesoaccumbal|mesoaccumbens|mesolimbic|midbrain|pvta|ventral-tegmental|vta'}
+
+drug_d={'alcohol':'acamprosate|alcohol|alcoholic|alcoholics|alcoholism|antabuse|campral|disulfiram|ethanol|naltrexone|revia|vivitrol',
+'amphetamine':'AMPH|amphetamine|METH|methamphetamine',
+'benzodiazepine':'adinazolam|alprazolam|benzodiazepine|benzos|brotizolam|chlordiazepoxide|climazolam|clobazam|clonazepam|clorazepate|diazepam|estazolam|flunitrazepam|flurazepam|halazepam|librium|loprazolam|lorazepam|lormetazepam|midazolam|nimetazepam|nitrazepam|normison|oxazepam|prazepam|temazepam|triazolam|valium|xanax',
+'cannabinoid':'acylethanolamines|cannabichromene|cannabidiol|cannabigerol|cannabinoid|cannabinoids|cannabinol|cannabis|cannabivarin|cesamet|drobinal|dronabinol|endocannabinoid|endocannabinoids|epidiolex|JWH-018|JWH-122|JWH-250|marijuana|marinol|nabilone|Oleoylethanolamide|palmitoylethanolamide|phytocannabinoid|rimonabant|SR141716|SR144528|syndros|tetrahydrocannabinol|tetrahydrocannabivarin|thc|thc-9',
+'cocaine':'cocaine',
+'nicotine':'nicotine|smoker|smokers|smoking|tobacco',
+'opioid':'buprenorphine|codeine|fentanyl|heroin|hycodan|hydrocodone|hydromorphone|kadian|kratom|methadone|morphine|naloxone|opioid|opioids|oxycodone|oxycontin|percocet|suboxone|tramadol|ultram|vicodin',
+'psychedelics':'ayahuasca|ecstasy|ibogaine|ketamine|LSD|lysergic-acid-diethylamide|MDMA|mescaline|methylenedioxymethamphetamine|N-methoxybenzyl|NBOMe|NBOMes|peyote|psilocybin|psychedelic|psychedelics'}
+
+function_d={'neuroplasticity':'boutons|epsc|epsp|IPSC|IPSP|long-term-depression|long-term-potentiation|LTD|LTP|mIPSC|neurite|neurogenesis|neuroplasticity|plasticity|synaptic',
+'neurotransmission':'5-ht|acetylcholine|cholinergic|DAergic|dopamine|dopaminergic|GABA|GABAergic|glutamate|glutamatergic|muscarinic|neuropeptide|neuropeptides|neurotransmission|nicotinic|serotonergic|serotonin',
+'signalling':'glycosylation|phosphorylation|signaling|signalling|kinase|binding|signal transduction|second messengers|cGMP|cAMP',
+'transcription':'histone|hypermethylation|hypomethylation|methylation|ribosome|transcription'}
+
+psychiatric_d={'anxiety':'anxiety|anxious',
+'autism':'autism|autistic',
+'bipolar':'bipolar-disorder',
+'compulsive':'compulsive|obsessive',
+'depression':'depression|depressive|major-depressive-disorder|MDD',
+'impulsivity':'5-CSRTT|5-choice-task|delay-discounting|delay-exposure|delay-intolerance|delayed-reward|delay-task|five-choice-serial-reaction-time-task|impulsive|impulsivity|premature-responding',
+'schizophrenia':'schizophrenia'}
+
+stress_d={'PTSD':'PTSD|post-traumatic-stress|post-traumatic-stress-symptoms|post-traumatic-stress-disorder',
+'stress':'distress|psychological-trauma|stress'}
+
