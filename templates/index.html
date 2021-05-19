@@ -2,52 +2,91 @@
 {% block content %}
 {{ message | safe }}
 
-<h3> <u>R</u>elationship with <u>A</u>ddiction <u>T</u>hrough <u>S</u>earches of <u>Pub</u>Med </span></a>
-</h3>
-<table>
-	<tr><td >
-			<p> RatsPub is a tool to efficiently and comprehensively answer the question <b>"What do we know about these genes and addiction?".  </b>
+<h3> Mining Gene Relationships  from PubMed using  Custom Ontologies </h3>
 
-			<p>RatsPub answers this question by searching PubMed to find <i>sentences</i> containing the query terms (i.e., gene symbols) and <a href="https://github.com/chen42/RatsPub/blob/master/ratspub_keywords.py">over 300 drug addiction-related keywords</a> that are organized into six categories. Data from <a href="https://www.ebi.ac.uk/gwas/">NHGRI-EBI GWAS catalog </a>are also included in the search. These gene-keyword relationships are presented as an interactive graph and a table.	
-			<p>Gene alias often include non-specific words and are thus not included in the initial search. However, a list of alias can be found by clicking on the gene symbol in the results section. These alias then can be searched with a single click.  
-			<p>
-You can create an account if you need to save your results. Up to 30 gene symbols can be entered in the box below. Gene symbols can be separated by either a space or a semicolon. 
-<br>		<b> Example: </b><a href=http://rats.pub/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=function&query=Rgma+Nrxn3+Chrna3>Rgma Nrxn3 Chrna3</a>.
+<div class="row">
+	<div class="col-md-9">
+		<p>GeneCup is a tool to efficiently and comprehensively answer the question <b>"What do we know about these genes and the topic I study?".  
+		</b> GeneCup answers this question by searching PubMed to find <i>sentences</i> containing gene symbols and a custom list of keywords. 
+		These keywords are organized into a user defined ontology, which groups related keywords together for better organization of the results.  
+		Human GWAS findings from <a href="https://www.ebi.ac.uk/gwas/">NHGRI-EBI GWAS catalog </a>are also included in the search.
+		These gene-keyword relationships are presented as an interactive graph and a table. 
+		<!--Gene alias often include non-specific words and are thus not included in the initial search. 
+			However, a list of alias can be found by clicking on the gene symbol in the results section. 
+			These alias then can be searched with a single click. --> 
+		As an example, we present a curated ontology for drug addiction with over <a href="/ontology"> 300 keywords organized into seven categories.
+		</a> A user account (free) is needed to create custom ontologies and save the search results.
+		</p>
 
-		<p> 
-		<b>	{%if "name" in session %}
-				{{session['name']}}, your previous searches are available in the <a href="/userarchive"> archive </a>.</a>
-			{% else %}
-			{% endif %}
-		</b>
+		<p>Example: </b><a href=/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=cell&type=function&query=Rgma+Nrxn3>Rgma Nrxn3</a>.</p>
+		
+		{%if ("name" not in session) %}
+			By default, the <a href="/ontology">addiction</a> ontology is used. Custom ontologies can be created in user accounts. 
+			Please choose keyword categories to be included in the search. 
 
-	<a>
-	<form action="/progress">
-		<div class="form-group row">
-			<div class="col-sm-10">
-				<strong>Please choose keyword categories to be included in the search:</strong>
-				<label>
-				<input type="checkbox" name="type" value="GWAS" checked> Human GWAS 	
-				<input type="checkbox" name="type" value="addiction" checked> Addiction Stage 				
-				<input type="checkbox" name="type" value="drug" checked> Drugs		
-				<input type="checkbox" name="type" value="brain" checked> Brain Region				
-				<input type="checkbox" name="type" value="stress" checked> Stress				
-				<input type="checkbox" name="type" value="psychiatric" checked> Psychiatric Diseases
-				<input type="checkbox" name="type" value="function" checked> Function				
-				</label>
-			</div>
-			<textarea name="query" class="form-control form-control-lg" type="search" row="3" id="searchform"></textarea>
-			<button type="submit" class="btn btn-primary">Search</button>
-		</div>
-	</form>
+			<form action="/progress">
+				<div id="check_selection"></div>
+					Up to 200 gene symbols can be entered in the box below. Gene symbols can be separated by a space, a comma or a semicolon. <br>	
+				<textarea name="query" class="form-control form-control-lg" type="search" rows="4" e="100%" id="searchform"></textarea>
+				<button type="submit" class="btn btn-primary">Search</button>
+			</form>
 
+		{% else %}	
+			Welcome back, <b> {{session['name']}}</b>. Your <a href="/userarchive"> previous searches </a> 
+			and <a href="/ontoarchive"> custom ontologies </a> are available from the links.
 
-		</td>
-		<td >
-			<div class='img'><img src="/static/ratspub.png" class="img-fluid">
-		</td>
-	</tr>
-</table>
+			<form action="/index_ontology">
+				<div id="onto_selection">Please select an ontology to use for the new search</div>
+				<button type="submit" class="btn btn-secondary btn-sm">Select</button>
+			</form>
+			
+			The <font color="tomato"> <strong>{{ontol}}</strong> </font> ontology is selected. Please choose categories to be included in the search. 
+			Expect a longer wait time when you include <b>Human GWAS</b> category.
+
+			<form action="/progress">
+				<div id="check_selection"></div>
+				Up to 200 gene symbols can be entered in the box below. Gene symbols can be separated by a space, a comma or a semicolon.   <br>	
+				<textarea name="query" class="form-control form-control-lg" type="search" rows="4" e="100%" id="searchform"></textarea>
+				<button type="submit" class="btn btn-primary">Search</button>
+			</form>
+		{% endif %}
+	</div>
+
+	<div class="col-md-3">
+		<div class='img'><img src="/static/cytos.png" class="img-fluid"></div>
+	</div>
+</div>
+
+<script>
+	function toggle(source) {
+		type = document.getElementsByName('type');
+	for(var i=0, n=type.length;i<n;i++) {
+		type[i].checked = source.checked;
+	}
+	}
+	var newdiv = document.createElement('div');
+	var checkbox = '';
+	{%for ky in dict_onto.keys()%}
+		checkbox += '<strong><input type="checkbox" name="type" value="{{ky}}" checked> {{ky}}&nbsp &nbsp </strong>';
+	{% endfor %}
+	checkbox += ' <strong><input type="checkbox" name="type" value="GWAS" checked> Human GWAS&nbsp &nbsp </strong><strong><input type="checkbox" onClick="toggle(this)"/> (Un)select all'
+	newdiv.innerHTML = "<inout name='type' id='onto'> "+checkbox + " </input> ";
+	document.getElementById('check_selection').appendChild(newdiv);
+</script>
+
+{%if "name" in session %}
+	<script>
+		var newdiv = document.createElement('div');
+		var i=0
+		var options = '<option>addiction</option>';
+		{%for i in range(0,onto_len_dir)%}
+			options += " <option>{{onto_list[i]}}</option>";
+		{% endfor %}
+		newdiv.innerHTML = "<select name='onto' id='onto'> "+options + " </select> ";
+		document.getElementById('onto_selection').appendChild(newdiv);
+	</script>
+{% endif %}
+
 {% endblock %}
 
 

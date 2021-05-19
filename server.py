@@ -1,28 +1,33 @@
 #!/bin/env  python3
+from __future__ import print_function
 from flask import Flask, render_template, request, session, Response, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
+from flask import jsonify
+
 import json
 import shutil
-from flask import jsonify
-from datetime import datetime
 import bcrypt
 import hashlib
 import tempfile
 import random
 import string
-from ratspub import *
-import time
-import os
 import re
 import pytz
-
+import os
 from os import listdir
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-from collections import Counter
+import pandas as pd
 import numpy as np
 from numpy import array
+
+import nltk
+nltk.download('punkt')
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
+
+from collections import Counter
+from datetime import datetime
+from more_functions import *
+
 import tensorflow
 import tensorflow.keras
 from tensorflow.keras.models import Model
@@ -35,17 +40,20 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Embedding
 from tensorflow.keras import metrics
 from tensorflow.keras import optimizers
+from tensorflow.keras import backend as K
 import pickle
 
 app=Flask(__name__)
 #datadir="/export/ratspub/"
-datadir = "."
+#datadir = "."
+datadir="./"
+
 app.config['SECRET_KEY'] = '#DtfrL98G5t1dC*4'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///'+datadir+'userspub.sqlite'
 db = SQLAlchemy(app)
 nltk.data.path.append("./nlp/")
 
-# the sqlite database
+# Sqlite database
 class users(db.Model):
     __tablename__='user'
     id = db.Column(db.Integer, primary_key=True)
@@ -54,6 +62,7 @@ class users(db.Model):
     password = db.Column(db.String(128), nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Preprocessing of words for CNN
 def clean_doc(doc, vocab):
     doc = doc.lower()
     tokens = doc.split()
@@ -66,21 +75,20 @@ def clean_doc(doc, vocab):
     stemmed = [porter.stem(word) for word in tokens]
     return tokens
 
-# load tokenizer
+# Load tokenizer
 with open('./nlp/tokenizer.pickle', 'rb') as handle:
     tokenizer = pickle.load(handle)
 
-# load vocabulary
+# Load vocabulary
 with open('./nlp/vocabulary.txt', 'r') as vocab:
     vocab = vocab.read()
 
 def tf_auc_score(y_true, y_pred):
     return tensorflow.metrics.auc(y_true, y_pred)[1]
 
-from tensorflow.keras import backend as K
 K.clear_session()
 
-# create the CNN model
+# Create the CNN model
 def create_model(vocab_size, max_length):
     model = Sequential()
     model.add(Embedding(vocab_size, 32, input_length=max_length))
@@ -93,44 +101,75 @@ def create_model(vocab_size, max_length):
     model.compile(loss='binary_crossentropy', optimizer=opt, metrics=[tf_auc_score])
     return model
 
+# Use addiction ontology by default
+onto_cont=open("addiction.onto","r").read()
+dictionary=ast.literal_eval(onto_cont)
+
+
 @app.route("/")
 def root():
-    return render_template('index.html')
+    if 'email' in session:
+        ontoarchive()
+        onto_len_dir = session['onto_len_dir']
+        onto_list = session['onto_list']
+    else: 
+        onto_len_dir = 0
+        onto_list = ''
+
+    onto_cont=open("addiction.onto","r").read()
+    dict_onto=ast.literal_eval(onto_cont)
+    return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
 
 @app.route("/login", methods=["POST", "GET"])
 def login():
+    onto_len_dir = 0
+    onto_list = ''
+    onto_cont=open("addiction.onto","r").read()
+    dict_onto=ast.literal_eval(onto_cont)
     email = None
+
     if request.method == "POST":
         email = request.form['email']
         password = request.form['password']
         found_user = users.query.filter_by(email=email).first()
         if (found_user and (bcrypt.checkpw(password.encode('utf8'), found_user.password))):
             session['email'] = found_user.email
-            print(bcrypt.hashpw(session['email'].encode('utf8'), bcrypt.gensalt()))
+            #print(bcrypt.hashpw(session['email'].encode('utf8'), bcrypt.gensalt()))
             session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
             session['name'] = found_user.name
             session['id'] = found_user.id
+            flash("Login Succesful!")
         else:
-            flash("Invalid username or password!", "loginout")
+            flash("Invalid username or password!", "inval")
             return render_template('signup.html')
-    flash("Login Succesful!", "loginout")
-    return render_template('index.html')
+ 
+    return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
 
 @app.route("/signup", methods=["POST", "GET"])
 def signup():
+    onto_len_dir = 0
+    onto_list = ''
+    onto_cont=open("addiction.onto","r").read()
+    dict_onto=ast.literal_eval(onto_cont)
+
     if request.method == "POST":
         name = request.form['name']
         email = request.form['email']
         password = request.form['password']
         found_user = users.query.filter_by(email=email).first()
+
         if (found_user and (bcrypt.checkpw(password.encode('utf8'), found_user.password)==False)):
-            flash("Already registered, but wrong password!", "loginout")
-            return render_template('signup.html')        
+            flash("Already registered, but wrong password!", "inval")
+            return render_template('signup.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)  
+
         session['email'] = email
         session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
         session['name'] = name
         password = bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt())
         user = users(name=name, email=email, password = password)       
+
         if found_user:
             session['email'] = found_user.email
             session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
@@ -142,13 +181,18 @@ def signup():
             db.session.commit()
             newuser = users.query.filter_by(email=session['email']).first()
             session['id'] = newuser.id
-        flash("Login Succesful!", "loginout")
-        return render_template('index.html')
+            os.makedirs(datadir+"/user/"+str(session['hashed_email']))
+            session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
+            os.makedirs(session['user_folder']+"/ontology/")
+
+        flash("Login Succesful!")
+        return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
     else:
         if 'email' in session:
             flash("Already Logged In!")
-            return render_template('index.html')
-        return render_template('signup.html')
+            return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+        return render_template('signup.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
 
 @app.route("/signin", methods=["POST", "GET"])
 def signin():
@@ -157,15 +201,20 @@ def signin():
         email = request.form['email']
         password = request.form['password']
         found_user = users.query.filter_by(email=email).first()
+
         if (found_user and (bcrypt.checkpw(password.encode('utf8'), found_user.password))):
             session['email'] = found_user.email
             session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
             session['name'] = found_user.name
             session['id'] = found_user.id
-            flash("Login Succesful!", "loginout")
-            return render_template('index.html')
+            flash("Login Succesful!")
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
         else:
-            flash("Invalid username or password!", "loginout")
+            flash("Invalid username or password!", "inval")
             return render_template('signup.html')   
     return render_template('signin.html')
 
@@ -178,6 +227,7 @@ def profile(nm_passwd):
             user_passwd = str(nm_passwd).split("_")[1]
             user_passwd = "b\'"+user_passwd+"\'"
             found_user = users.query.filter_by(name=user_name).first()
+
             if request.method == "POST":
                 password = request.form['password']
                 session['email'] = found_user.email
@@ -187,8 +237,12 @@ def profile(nm_passwd):
                 password = bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt())
                 found_user.password = password
                 db.session.commit()
-                flash("Your password is changed!", "loginout")
-                return render_template('index.html')
+                flash("Your password is changed!", "inval")
+                onto_len_dir = 0
+                onto_list = ''
+                onto_cont=open("addiction.onto","r").read()
+                dict_onto=ast.literal_eval(onto_cont)
+                return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
             # remove reserved characters from the hashed passwords
             reserved = (";", "/", "?", ":", "@", "=", "&", ".")
             def replace_reserved(fullstring):
@@ -196,6 +250,7 @@ def profile(nm_passwd):
                     fullstring = fullstring.replace(replace_str,"")
                 return fullstring
             replaced_passwd = replace_reserved(str(found_user.password))
+
             if replaced_passwd == user_passwd:
                 return render_template("/passwd_change.html", name=user_name)
             else:
@@ -205,35 +260,371 @@ def profile(nm_passwd):
     except (AttributeError):
         return "This url does not exist"
 
+
 @app.route("/logout")
 def logout():
+    onto_len_dir = 0
+    onto_list = ''
+    onto_cont=open("addiction.onto","r").read()
+    dict_onto=ast.literal_eval(onto_cont)
+
     if 'email' in session:
         global user1
         if session['name'] != '':
             user1 = session['name']
         else: 
             user1 = session['email']
-    flash("You have been logged out, {user1}", "loginout")
+    flash("You have been logged out, {user1}", "inval")
     session.pop('email', None)
     session.clear()
-    return render_template('index.html')
+    return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
 
 @app.route("/about")
 def about():
     return render_template('about.html')
 
+
+# Ontology selection
+@app.route("/index_ontology", methods=["POST", "GET"])
+def index_ontology():
+    namecat2 = request.args.get('onto')
+    session['namecat']=namecat2
+
+    if (namecat2 == 'addiction' or namecat2 == 'Select your ontology' ):
+        session['namecat']='addiction'
+        onto_cont=open("addiction.onto","r").read()
+    else:
+        dirlist = os.listdir(session['user_folder']+"/ontology/")
+        for filename in dirlist:
+            onto_name = filename.split('_0_')[1]
+            if namecat2 == onto_name:
+                onto_cont = open(session['user_folder']+"/ontology/"+filename+"/"+namecat2+".onto", "r").read()
+                break
+    dict_onto=ast.literal_eval(onto_cont)
+    onto_len_dir = session['onto_len_dir']
+    onto_list = session['onto_list']
+    return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = session['namecat'], dict_onto=dict_onto )
+
+
+@app.route("/ontology", methods=["POST", "GET"])
+def ontology():
+    namecat2 = request.args.get('onto')
+    select_date=request.args.get('selected_date')
+    namecat_exist=0
+
+    if select_date != None:
+        time_extension = str(select_date)
+        time_extension = time_extension.split('_0_')[0]
+        namecat = str(select_date).split('_0_')[1]
+        time_extension = time_extension.replace(':', '_')
+        time_extension = time_extension.replace('-', '_')
+
+        if ('email' in session):
+            session['namecat'] = session['user_folder']+"/ontology/"+str(time_extension)+"_0_"+namecat+"/"+namecat
+        else:
+            session['namecat']=tempfile.gettempdir()+'/'+namecat
+        onto_cont = open(session['namecat']+".onto","r").read()
+
+        if onto_cont=='':
+            dict_onto={}
+        else:
+            dict_onto=ast.literal_eval(onto_cont)
+    elif (('email' in session) and (namecat2 == 'addiction')):
+        namecat='addiction'
+        session['namecat']=namecat
+        onto_cont = open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+    else:
+        if (('email' in session) and ((namecat2 != None) and (namecat2 != 'choose your ontology'))):
+            namecat=namecat2
+            dirlist = os.listdir(session['user_folder']+"/ontology/")
+
+            for filename in dirlist:
+                onto_name = filename.split('_0_')[1]
+                if onto_name==namecat:
+                    namecat_exist=1
+                    namecat_filename=filename
+                    break
+            if namecat_exist==1:
+                session['namecat'] = session['user_folder']+"/ontology/"+namecat_filename+'/'+namecat
+            else:
+                onto_cont = open("addiction.onto","r").read()
+                dict_onto=ast.literal_eval(onto_cont)
+        else:
+            namecat='addiction'
+            session['namecat']=namecat
+            onto_cont = open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+
+    if request.method == "POST":
+        maincat = request.form['maincat']
+        subcat = request.form['subcat']
+        keycat = request.form['keycat']
+        namecat = request.form['namecat']
+        namecat_exist=0
+        maincat=re.sub('[^,a-zA-Z0-9 \n]', '', maincat)
+        subcat=re.sub('[^,a-zA-Z0-9 \n]', '', subcat)
+        keycat=re.sub('[^,a-zA-Z0-9 \n]', '', keycat)
+        keycat = keycat.replace(',', '|')
+        keycat = re.sub("\s+", ' ', keycat)
+        keycat = keycat.replace(' |', '|')
+        keycat = keycat.replace('| ', '|')
+        namecat=re.sub('[^,a-zA-Z0-9 \n]', '', namecat)
+
+        # Generate a unique session ID depending on timestamp to track the results 
+        timestamp = datetime.utcnow().replace(microsecond=0)
+        timestamp = timestamp.replace(tzinfo=pytz.utc)
+        timestamp = timestamp.astimezone(pytz.timezone("America/Chicago"))
+        timeextension = str(timestamp)
+        timeextension = timeextension.replace(':', '_')
+        timeextension = timeextension.replace('-', '_')
+        timeextension = timeextension.replace(' ', '_')
+        timeextension = timeextension.replace('_06_00', '')
+        session['timeextension'] = timeextension
+
+        if request.form['submit'] == 'add':  # Add new keywords or create a new ontology
+            if ('email' in session):
+                session['namecat']=namecat
+                if (namecat=='addiction'):
+                    flash("You cannot change addiction keywords but a new ontology will be saved as 'addictionnew', instead","inval")
+                    namecat='addictionnew'
+                    session['namecat']=namecat
+                session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
+                dirlist = os.listdir(session['user_folder']+"/ontology/")
+                for filename in dirlist:
+                    onto_name = filename.split('_0_')[1]
+                    if onto_name==namecat:
+                        namecat_exist=1  # Add new keywords
+                        namecat_filename=filename
+                        break
+                if namecat_exist==0:  # Create a new ontology folder
+                    os.makedirs(session['user_folder']+"/ontology/"+str(timeextension)+"_0_"+namecat,exist_ok=True)
+                    session['namecat'] = session['user_folder']+"/ontology/"+str(timeextension)+"_0_"+namecat+"/"+namecat
+                    if namecat=='addictionnew':
+                        with open("addiction.onto","r") as f1:
+                            with open(session['namecat']+".onto", "w") as f2:
+                                for line in f1:
+                                    f2.write(line)  
+                    else: 
+                        f= open(session['namecat']+".onto","w")
+                        dict_onto={}
+                else:
+                    session['namecat'] = session['user_folder']+"/ontology/"+namecat_filename+'/'+namecat
+
+                onto_cont=open(session['namecat']+".onto",'r').read()
+                if onto_cont=='':
+                    dict_onto={}
+                else:
+                    dict_onto=ast.literal_eval(onto_cont)
+
+                flag_kw=0
+                if (',' in maincat) or (',' in subcat):
+                    flash("Only one word can be added to the category and subcategory at a time.","inval")
+                elif maincat in dict_onto.keys():  # Layer 2, main category 
+                    if subcat in dict_onto[maincat].keys():  # Layer 3, keywords shown in results 
+                        keycat_ls = keycat.split('|')
+                        for kw in str.split(next(iter(dict_onto[maincat][subcat])), '|'):  # Layer 4, synonyms
+                            for keycat_word in keycat_ls:
+                                if kw==keycat_word:
+                                    flash("\""+kw+"\" is already in keywords under the subcategory \""+ subcat \
+                                        + "\" that is under the category \""+ maincat+"\"","inval")
+                                    flag_kw=1
+                        if flag_kw==0:
+                            dict_onto[maincat][subcat]= '{'+next(iter(dict_onto[maincat][subcat]))+'|'+keycat+'}'
+                            dict_onto=str(dict_onto).replace('\'{','{\'')
+                            dict_onto=str(dict_onto).replace('}\'','\'}')
+                            dict_onto=str(dict_onto).replace('}},','}},\n')
+                            with open(session['namecat']+'.onto', 'w') as file3:
+                                file3.write(str(dict_onto))
+                    else:
+                        dict_onto[maincat][subcat]='{'+subcat+'|'+keycat+'}'
+                        dict_onto=str(dict_onto).replace('\'{','{\'')
+                        dict_onto=str(dict_onto).replace('}\'','\'}')
+                        dict_onto=str(dict_onto).replace('}},','}},\n')
+                        with open(session['namecat']+'.onto', 'w') as file3:
+                            file3.write(str(dict_onto))
+                else:
+                    dict_onto[maincat]= '{'+subcat+'\': {\''+keycat+'}'+'}'
+                    dict_onto=str(dict_onto).replace('\"{','{\'')
+                    dict_onto=str(dict_onto).replace('}\"','\'}')
+                    dict_onto=str(dict_onto).replace('\'{','{\'')
+                    dict_onto=str(dict_onto).replace('}\'','\'}')
+                    dict_onto=str(dict_onto).replace('}},','}},\n')
+                    with open(session['namecat']+'.onto', 'w') as file3:
+                        file3.write(str(dict_onto))
+            else:
+                if namecat=='addiction':
+                    flash("You must login to change the addiction ontology.")
+                else:
+                    flash("You must login to create a new ontology.")
+        
+        if request.form['submit'] == 'remove':
+            if ('email' in session):
+                session['namecat']=namecat
+                if (namecat=='addiction'):
+                    flash("You cannot change addiction keywords but a new ontology will be saved as 'addictionnew', instead","inval")
+                    namecat='addictionnew'
+                    session['namecat']=namecat
+                session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
+                dirlist = os.listdir(session['user_folder']+"/ontology/")
+                for filename in dirlist:
+                    onto_name = filename.split('_0_')[1]
+                    if onto_name==namecat:
+                        namecat_exist=1
+                        namecat_filename=filename
+                        break
+                if namecat_exist==0:
+                    os.makedirs(session['user_folder']+"/ontology/"+str(timeextension)+"_0_"+namecat,exist_ok=True)
+                    session['namecat'] = session['user_folder']+"/ontology/"+str(timeextension)+"_0_"+namecat+"/"+namecat
+                    if namecat=='addictionnew':
+                        with open("addiction.onto","r") as f1:
+                            with open(session['namecat']+".onto", "w") as f2:
+                                for line in f1:
+                                    f2.write(line)  
+                    else: 
+                        f= open(session['namecat']+".onto","w")
+                        dict_onto={}
+
+                else:
+                    session['namecat'] = session['user_folder']+"/ontology/"+namecat_filename+'/'+namecat
+
+                onto_cont=open(session['namecat']+".onto",'r').read()
+                if onto_cont=='':
+                    dict_onto={}
+                else:
+                    dict_onto=ast.literal_eval(onto_cont)
+                
+                flag_kw=0
+                if maincat in dict_onto.keys():  # Layer 2, main category 
+                    if subcat in dict_onto[maincat].keys():  # Layer 3, keywords shown in results 
+                        for kw in str.split(next(iter(dict_onto[maincat][subcat])), '|'):
+                            keycat_ls = keycat.split('|')
+                            for keycat_word in keycat_ls:  # Layer 4, synonyms
+                                if kw==keycat_word:
+                                    dict_onto[maincat][subcat]=re.sub(r'\|'+keycat_word+'\'', '\'', str(dict_onto[maincat][subcat]))
+                                    dict_onto[maincat][subcat]=re.sub(r'\''+keycat_word+'\|', '\'', str(dict_onto[maincat][subcat]))
+                                    dict_onto[maincat][subcat]=re.sub(r'\|'+keycat_word+'\|', '|', str(dict_onto[maincat][subcat]))
+                                    dict_onto[maincat][subcat]=re.sub(r'\''+keycat_word+'\'', '', str(dict_onto[maincat][subcat]))
+                                    flag_kw=1
+                        if '{}' in dict_onto[maincat][subcat]:
+                            dict_onto[maincat]=re.sub(r', \''+subcat+'\': \'{}\' ', '', str(dict_onto[maincat]))
+                            dict_onto[maincat]=re.sub(r'\''+subcat+'\': \'{}\', ', '', str(dict_onto[maincat]))
+                            dict_onto[maincat]=re.sub(r'\''+subcat+'\': \'{}\'', '', str(dict_onto[maincat]))
+                        if '{}' in dict_onto[maincat]:
+                            dict_onto=re.sub(r', \''+maincat+'\': \'{}\'', '', str(dict_onto))                    
+                        dict_onto=str(dict_onto).replace('\"{','{')
+                        dict_onto=str(dict_onto).replace('}\"','}')
+                        dict_onto=str(dict_onto).replace('\'{','{')
+                        dict_onto=str(dict_onto).replace('}\'','}')                   
+                        with open(session['namecat']+'.onto', 'w') as file3:
+                            file3.write(str(dict_onto))
+                        if flag_kw==0:
+                            flash("\""+keycat+"\" is not a keyword.","inval")
+                    else:
+                        flash("\""+subcat+"\" is not a subcategory.","inval")
+                else:
+                    flash("\""+subcat+"\" is not a category.","inval")  
+            else:
+                if namecat=='addiction':
+                    flash("You must login to change the addiction ontology.")
+                else:
+                    flash("You must login to create a new ontology.")         
+
+    if 'namecat' in session:
+        file2 = open(session['namecat']+".onto","r")
+        onto_cont=file2.read()
+        if onto_cont=='':
+            dict_onto={}
+        else:
+            dict_onto=ast.literal_eval(onto_cont)
+    else:
+        session['namecat']='addiction'
+        file2 = open(session['namecat']+".onto","r")
+        onto_cont=file2.read()
+        dict_onto=ast.literal_eval(onto_cont)
+    name_to_html = str(session['namecat']).split('/')[-1]
+
+    if ('email' in session):
+        ontoarchive()
+        onto_len_dir = session['onto_len_dir']
+        onto_list = session['onto_list']
+    else:
+        onto_len_dir=0
+        onto_list=''
+    return render_template('ontology.html',dict_onto=dict_onto, namecat=name_to_html, onto_len_dir=onto_len_dir, onto_list=onto_list)
+
+
+@app.route("/ontoarchive")
+def ontoarchive():
+    session['onto_len_dir'] = 0
+    session['onto_list'] = ''
+    if ('email' in session):
+        if os.path.exists(datadir+"/user/"+str(session['hashed_email'])+"/ontology") == False:
+            flash("Ontology history doesn't exist!")
+            return render_template('index.html',onto_len_dir=session['onto_len_dir'], onto_list=session['onto_list'])
+        else:
+            session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
+    else:
+        flash("You logged out!")
+        onto_len_dir = 0
+        onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
+    session_id=session['id']
+    def sorted_alphanumeric(data):
+        convert = lambda text: int(text) if text.isdigit() else text.lower()
+        alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+        return sorted(data, key=alphanum_key)
+
+    dirlist = sorted_alphanumeric(os.listdir(session['user_folder']+"/ontology/"))  
+    onto_folder_list = []
+    onto_directory_list = []
+    onto_list=[]
+
+    for filename in dirlist:
+        onto_folder_list.append(filename)
+        onto_name = filename.split('_0_')[1]
+        onto_name = onto_name.replace('_', ', ')
+        onto_list.append(onto_name)
+        onto_name=""
+        filename=filename[0:4]+"-"+filename[5:7]+"-"+filename[8:13]+":"+filename[14:16]+":"+filename[17:19]
+        onto_directory_list.append(filename)
+
+    onto_len_dir = len(onto_directory_list)
+    session['onto_len_dir'] = onto_len_dir
+    session['onto_list'] = onto_list
+    message3="<ul><li> Click on the Date/Time to view archived results. <li>The Date/Time are based on US Central time zone.</ul> "
+    return render_template('ontoarchive.html', onto_len_dir=onto_len_dir, onto_list = onto_list, onto_folder_list=onto_folder_list, onto_directory_list=onto_directory_list, session_id=session_id, message3=message3)
+
+
+# Remove an ontology folder
+@app.route('/removeonto', methods=['GET', 'POST'])
+def removeonto():
+    if('email' in session):
+        remove_folder = request.args.get('remove_folder')
+        shutil.rmtree(datadir+"/user/"+str(session['hashed_email']+"/ontology/"+remove_folder), ignore_errors=True)
+        return redirect(url_for('ontoarchive'))
+    else:
+        flash("You logged out!")
+        onto_len_dir = 0
+        onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
+
 @app.route('/progress')
 def progress():
-    #get the type from checkbox
-    search_type = request.args.getlist('type')
-    if (search_type == []):
-        search_type = ['GWAS', 'function', 'addiction', 'drug', 'brain', 'stress', 'psychiatric']
-    session['search_type'] = search_type
-    # only 1-100 terms are allowed
     genes=request.args.get('query')
     genes=genes.replace(",", " ")
     genes=genes.replace(";", " ")
     genes=re.sub(r'\bLOC\d*?\b', "", genes, flags=re.I)
+    genes=genes.replace(" \'", " \"")
+    genes=genes.replace("\' ", "\" ")
+    genes=genes.replace("\'", "-")
     genes1 = [f[1:-1] for f in re.findall('".+?"', genes)]
     genes2 = [p for p in re.findall(r'([^""]+)',genes) if p not in genes1]
     genes2_str = ''.join(genes2)
@@ -241,15 +632,32 @@ def progress():
     genes3 = genes1 + genes2
     genes = [re.sub("\s+", '-', s) for s in genes3]
 
-    if len(genes)>=30:
-        message="<span class='text-danger'>Up to 30 terms can be searched at a time</span>"
-        return render_template('index.html', message=message)
-    elif len(genes)==0:
+    # Only 1-200 terms are allowed
+    if len(genes)>=200:
+        if ('email' in session):
+            onto_len_dir = session['onto_len_dir']
+            onto_list = session['onto_list']
+        else: 
+            onto_len_dir = 0
+            onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        message="<span class='text-danger'>Up to 200 terms can be searched at a time</span>"
+        return render_template('index.html' ,onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto, message=message)
+    
+    if len(genes)==0:
+        if ('email' in session):
+            onto_len_dir = session['onto_len_dir']
+            onto_list = session['onto_list']
+        else: 
+            onto_len_dir = 0
+            onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
         message="<span class='text-danger'>Please enter a search term </span>"
-        return render_template('index.html', message=message)
+        return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto, message=message)
+    
     tf_path=tempfile.gettempdir()
-    #tf_path = "/tmp/"
-
     genes_for_folder_name =""
     if len(genes) == 1:
         marker = ""
@@ -264,7 +672,7 @@ def progress():
         genes_for_folder_name =str(genes[0])+"_"+str(genes[1])+"_"+str(genes[2])
         marker="_m"
 
-    # generate a unique session ID depending on timestamp to track the results 
+    # Generate a unique session ID depending on timestamp to track the results 
     timestamp = datetime.utcnow().replace(microsecond=0)
     timestamp = timestamp.replace(tzinfo=pytz.utc)
     timestamp = timestamp.astimezone(pytz.timezone("America/Chicago"))
@@ -274,41 +682,86 @@ def progress():
     timeextension = timeextension.replace(' ', '_')
     timeextension = timeextension.replace('_06_00', '')
     session['timeextension'] = timeextension
-    user_login=0
-    #create a folder for the search
+    namecat_exist=0
+
+    # Create a folder for the search
     if ('email' in session):
-        os.makedirs(datadir + "/user/"+str(session['hashed_email'])+"/"+str(timeextension)+"_0_"+genes_for_folder_name+marker,exist_ok=True)
-        session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
-        session['path_user'] = datadir+"/user/"+str(session['hashed_email'])+"/"+str(timeextension)+"_0_"+genes_for_folder_name+marker+"/"
-        session['rnd'] = timeextension+"_0_"+genes_for_folder_name+marker
+        try:
+            namecat=session['namecat']
+        except:
+            namecat = 'addiction'
+            session['namecat'] = namecat
+        if namecat=='choose your ontology' or namecat=='addiction' or namecat == 'addiction':
+            session['namecat']='addiction'
+            onto_cont=open("addiction.onto","r").read()
+            dictionary=ast.literal_eval(onto_cont)
+            search_type = request.args.getlist('type')
+            if (search_type == []):
+                search_type = ['GWAS', 'function', 'addiction', 'drug', 'brain', 'stress', 'psychiatric', 'cell']
+            session['search_type'] = search_type
+        else:
+            dirlist = os.listdir(session['user_folder']+"/ontology/")
+            for filename in dirlist:
+                onto_name = filename.split('_0_')[1]
+                if onto_name==namecat:
+                    namecat_exist=1
+                    namecat_filename=filename
+                    break
+            if (namecat_exist==1):
+                session['namecat'] = session['user_folder']+"/ontology/"+namecat_filename+'/'+namecat
+                onto_cont=open(session['namecat']+".onto","r").read()
+                dict_onto=ast.literal_eval(onto_cont)
+                search_type = request.args.getlist('type')
+                if (search_type == []):
+                    search_type = list(dict_onto.keys())
+                session['search_type'] = search_type
+
+        # Save the ontology name in the user search history table
+        if session['namecat']=='addiction':
+            onto_name_archive = session['namecat']
+        elif ('/' in session['namecat']):
+            onto_name_archive = session['namecat'].split('/')[-1]
+        else:
+            onto_name_archive = '-'
+
+        os.makedirs(datadir + "/user/"+str(session['hashed_email'])+"/"+str(timeextension)+"_0_"+genes_for_folder_name+marker+"_0_"+onto_name_archive,exist_ok=True)
+        session['path_user'] = datadir+"/user/"+str(session['hashed_email'])+"/"+str(timeextension)+"_0_"+genes_for_folder_name+marker+"_0_"+onto_name_archive+"/"
+        session['rnd'] = timeextension+"_0_"+genes_for_folder_name+marker+"_0_"+onto_name_archive
         rnd = session['rnd']
     else:
         rnd = "tmp" + ''.join(random.choice(string.ascii_letters) for x in range(6)) 
         session['path']=tf_path+ "/" + rnd
-        #os.makedirs(datadir+ session['path'])
         os.makedirs(session['path'])
-    
+        search_type = request.args.getlist('type')
+
+        if (search_type == []):
+            search_type = ['GWAS', 'function', 'addiction', 'drug', 'brain', 'stress', 'psychiatric', 'cell']
+        session['search_type'] = search_type
     genes_session = ''
+
     for gen in genes:
         genes_session += str(gen) + "_"
+
     genes_session = genes_session[:-1]
     session['query']=genes
+    return render_template('progress.html', url_in="search", url_out="cytoscape/?rnd="+rnd+"&genequery="+genes_session)
 
-    return render_template('progress.html', url_in="search", url_out="cytoscape?rnd="+rnd+"&genequery="+genes_session)
 
 @app.route("/search")
 def search():
     genes=session['query']
+    percent_ratio=len(genes)
+
+    if(len(genes)==1):
+        percent_ratio=2
     timeextension=session['timeextension']
-    percent=round(100/(len(genes)*6),1) # 6 categories 
+    percent=round(100/percent_ratio*8,1) # 7 categories + 1 at the beginning
+
     if ('email' in session):
         sessionpath = session['path_user'] + timeextension
         path_user=session['path_user']
-        user_login=1
     else:
-        user_login=0
         sessionpath = session['path']
-        #path_user=datadir+session['path']+"/"
         path_user=session['path']+"/"
 
     snt_file=sessionpath+"_snt"
@@ -316,33 +769,55 @@ def search():
     sntdata=open(snt_file,"w+")
     zeroLinkNode=open(sessionpath+"_0link","w+")
     search_type = session['search_type']
-    #consider the types got from checkbox
     temp_nodes = ""
     json_nodes = "{\"data\":["
-    if ("function" in search_type):
-        temp_nodes += n0
-        json_nodes += nj0
-    if ("addiction" in search_type):
-        temp_nodes += n1   
-        json_nodes += nj1    
-    if ("drug" in search_type):
-        temp_nodes += n2
-        json_nodes += nj2
-    if ("brain" in search_type):
-        temp_nodes += n3
-        json_nodes += nj3
-    if ("stress" in search_type):
-        temp_nodes += n4
-        json_nodes += nj4
-    if ("psychiatric" in search_type):
-        temp_nodes += n5  
-        json_nodes += nj5   
-    if ("GWAS" in search_type):
-        temp_nodes += n6  
-        json_nodes += nj6
+    
+    n_num=0
+    d={}
+    nodecolor={}
+    nodecolor['GWAS'] = "hsl(0, 0%, 70%)"
+    nodes_list = []
+    nodes_list_for_gwas = []
+
+    if 'namecat' in session:
+        namecat_flag=1
+        ses_namecat = session['namecat']
+        onto_cont = open(session['namecat']+".onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+
+        for ky in dict_onto.keys():
+            for nd_g in dict_onto[ky]:
+                nodes_list_for_gwas.append(nd_g)
+            nodecolor[ky] = "hsl("+str((n_num+1)*int(360/len(dict_onto.keys())))+", 70%, 80%)"
+            d["nj{0}".format(n_num)]=generate_nodes_json(dict_onto[ky],str(ky),nodecolor[ky])
+            n_num+=1
+
+            if (ky in search_type):
+                temp_nodes += generate_nodes(dict_onto[ky],str(ky),nodecolor[ky])
+
+                for nd in dict_onto[ky]:
+                    nodes_list.append(nd)
+                json_nodes += generate_nodes_json(dict_onto[ky],str(ky),nodecolor[ky] )
+        d["nj{0}".format(n_num)]=''
+    else:
+        namecat_flag=0
+        for ky in dictionary.keys():
+            for nd_g in dictionary[ky]:
+                nodes_list_for_gwas.append(nd_g)
+            nodecolor[ky] = "hsl("+str((n_num+1)*int(360/len(dictionary.keys())))+", 70%, 80%)"
+            d["nj{0}".format(n_num)]=generate_nodes_json(dictionary[ky],str(ky),nodecolor[ky])
+            n_num+=1
+
+            if (ky in search_type):
+                temp_nodes += generate_nodes(dictionary[ky],str(ky),nodecolor[ky])
+
+                for nd in dictionary[ky]:
+                    nodes_list.append(nd)
+                json_nodes += generate_nodes_json(dictionary[ky],str(ky),nodecolor[ky])
+        d["nj{0}".format(n_num)]=''
+    
     json_nodes = json_nodes[:-2]
     json_nodes =json_nodes+"]}"
-
     def generate(genes, tf_name):
         with app.test_request_context():
             sentences=str()
@@ -352,88 +827,105 @@ def search():
             searchCnt=0
             nodesToHide=str()
             json_edges = str()
+            progress+=percent            
+            genes_or = ' or '.join(genes)
+            all_d=''
+
+            if namecat_flag==1:
+                onto_cont = open(ses_namecat+".onto","r").read()
+                dict_onto=ast.literal_eval(onto_cont)
+
+                for ky in dict_onto.keys():
+                    if (ky in search_type):
+                        ls_plural = list(dict_onto[ky].values())
+                        all_d_ls=undic(list(dict_onto[ky].values()))
+                        all_d = all_d+'|'+all_d_ls
+            else:
+                for ky in dictionary.keys():
+                    if (ky in search_type):
+                        all_d_ls=undic(list(dictionary[ky].values()))
+                        all_d = all_d+'|'+all_d_ls
+            all_d=all_d[1:]
+            abstracts_raw = getabstracts(genes_or,all_d)
+            progress+=percent
+            sentences_ls=[]
+
+            for row in abstracts_raw.split("\n"):
+                tiab=row.split("\t")
+                pmid = tiab.pop(0)
+                tiab= " ".join(tiab)
+                sentences_tok = sent_tokenize(tiab)
+                for sent_tok in sentences_tok:
+                    sent_tok = pmid + ' ' + sent_tok
+                    sentences_ls.append(sent_tok)
             for gene in genes:
                 gene=gene.replace("-"," ")
                 # report progress immediately
                 progress+=percent
                 yield "data:"+str(progress)+"\n\n"
-                #addiction terms must present with at least one drug
-                addiction=undic(addiction_d) +") AND ("+undic(drug_d)
-                sent0=gene_category(gene, addiction_d, addiction, "addiction")
-                e0=generate_edges(sent0, tf_name)
-                ej0=generate_edges_json(sent0, tf_name)
-                # drug
-                drug=undic(drug_d)
-                sent1=gene_category(gene, drug_d, drug, "drug")
-                progress+=percent
-                yield "data:"+str(progress)+"\n\n"
-                e1=generate_edges(sent1, tf_name)
-                ej1=generate_edges_json(sent1, tf_name)
-                # function
-                function=undic(function_d)
-                sent2=gene_category(gene, function_d, function, "function")
-                progress+=percent
-                yield "data:"+str(progress)+"\n\n"
-                e2=generate_edges(sent2, tf_name)
-                ej2=generate_edges_json(sent2, tf_name)
-                # brain has its own query terms that does not include the many short acronyms
-                sent3=gene_category(gene, brain_d, brain_query_term, "brain")
-                progress+=percent
-                e3=generate_edges(sent3, tf_name)
-                ej3=generate_edges_json(sent3, tf_name)
-                # stress
-                stress=undic(stress_d)
-                sent4=gene_category(gene, stress_d, stress, "stress")
-                progress+=percent
-                yield "data:"+str(progress)+"\n\n"
-                e4=generate_edges(sent4, tf_name)
-                ej4=generate_edges_json(sent4, tf_name)
-                # psychiatric 
-                psychiatric=undic(psychiatric_d)
-                sent5=gene_category(gene, psychiatric_d, psychiatric, "psychiatric")
-                progress+=percent
-                yield "data:"+str(progress)+"\n\n"
-                e5=generate_edges(sent5, tf_name)
-                ej5=generate_edges_json(sent5, tf_name)
-                # GWAS
-                e6=searchArchived('GWAS', gene, 'cys')
-                ej6=searchArchived('GWAS', gene , 'json')
-                #consider the types got from checkbox
                 geneEdges = ""
-                if ("addiction" in search_type):
-                    geneEdges += e0
-                    json_edges += ej0
-                if ("drug" in search_type):
-                    geneEdges += e1   
-                    json_edges += ej1    
-                if ("function" in search_type):
-                    geneEdges += e2
-                    json_edges += ej2
-                if ("brain" in search_type):
-                    geneEdges += e3
-                    json_edges += ej3
-                if ("stress" in search_type):
-                    geneEdges += e4
-                    json_edges += ej4
-                if ("psychiatric" in search_type):
-                    geneEdges += e5  
-                    json_edges += ej5  
+
+                if namecat_flag==1:
+                    onto_cont = open(ses_namecat+".onto","r").read()
+                    dict_onto=ast.literal_eval(onto_cont)
+                else:
+                    dict_onto = dictionary
+
+                for ky in dict_onto.keys():
+                    if (ky=='addiction') and ('addiction' in dict_onto.keys())\
+                        and ('drug' in dict_onto.keys()) and ('addiction' in dict_onto['addiction'].keys())\
+                        and ('aversion' in dict_onto['addiction'].keys()) and ('intoxication' in dict_onto['addiction'].keys()):
+                        #addiction terms must present with at least one drug
+                        addiction_flag=1
+                        #addiction=undic0(addiction_d) +") AND ("+undic0(drug_d)
+                        sent=gene_category(gene, addiction_d, "addiction", sentences_ls,addiction_flag,dict_onto)
+                        if ('addiction' in search_type):
+                            geneEdges += generate_edges(sent, tf_name)
+                            json_edges += generate_edges_json(sent, tf_name)
+                    else:
+                        addiction_flag=0
+                        if namecat_flag==1:
+                            onto_cont = open(ses_namecat+".onto","r").read()
+                            dict_onto=ast.literal_eval(onto_cont)
+                            #ky_d=undic(list(dict_onto[ky].values()))    
+                            sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
+                            
+                        else:
+                            ky_d=undic(list(dict_onto[ky].values()))
+                            sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
+                        progress+=percent
+                        yield "data:"+str(progress)+"\n\n"
+                        if (ky in search_type):
+                            geneEdges += generate_edges(sent, tf_name)
+                            json_edges += generate_edges_json(sent, tf_name)                
+                    sentences+=sent
                 if ("GWAS" in search_type):
-                    geneEdges += e6  
-                    json_edges += ej6                           
-                if len(geneEdges) >1:
+                    gwas_sent=[]
+                    for nd in nodes_list_for_gwas:
+                        gwas_text=''
+                        datf = pd.read_csv('./utility/gwas_used.csv',sep='\t')
+                        datf_sub = datf[datf['DISEASE/TRAIT'].str.contains(nd,regex=False, case=False, na=False)
+                            & (datf['REPORTED GENE(S)'].str.contains(gene,regex=False, case=False, na=False)
+                            | (datf['MAPPED_GENE'].str.contains(gene,regex=False, case=False, na=False)))]
+                        
+                        if not datf_sub.empty:
+                            for index, row in datf_sub.iterrows():
+                                gwas_text = "SNP:<b>"+str(row['SNPS'])+"</b>, P value: <b>"+str(row['P-VALUE'])\
+                                    +"</b>, Disease/trait:<b> "+str(row['DISEASE/TRAIT'])+"</b>, Mapped trait:<b> "\
+                                    +str(row['MAPPED_TRAIT'])+"</b><br>"
+                                gwas_sent.append(gene+"\t"+"GWAS"+"\t"+nd+"_GWAS\t"+str(row['PUBMEDID'])+"\t"+gwas_text)
+                    cys, gwas_json, sn_file = searchArchived('GWAS', gene , 'json',gwas_sent, path_user)
+                    with open(path_user+"gwas_results.tab", "w") as gwas_edges:
+                        gwas_edges.write(sn_file)
+                    geneEdges += cys
+                    json_edges += gwas_json  
+                                    
+                if len(geneEdges) >0:
                     edges+=geneEdges
                     nodes+="{ data: { id: '" + gene +  "', nodecolor:'#E74C3C', fontweight:700, url:'/synonyms?node="+gene+"'} },\n"
                 else:
                     nodesToHide+=gene +  " "
-                sentences+=sent0+sent1+sent2+sent3+sent4+sent5
-                sent0=None 
-                sent1=None
-                sent2=None
-                sent3=None
-                sent4=None
-                sent5=None
-                #save data before the last yield
+
                 searchCnt+=1
                 if (searchCnt==len(genes)):
                     progress=100
@@ -444,32 +936,42 @@ def search():
                     zeroLinkNode.write(nodesToHide)
                     zeroLinkNode.close()
                 yield "data:"+str(progress)+"\n\n"
-            #edges in json format
+
+           # Edges in json format
             json_edges="{\"data\":["+json_edges
             json_edges = json_edges[:-2]
             json_edges =json_edges+"]}"
-            #write edges to txt file in json format also in user folder
+
+            # Write edges to txt file in json format also in user folder
             with open(path_user+"edges.json", "w") as temp_file_edges:
                 temp_file_edges.write(json_edges) 
     with open(path_user+"nodes.json", "w") as temp_file_nodes:
         temp_file_nodes.write(json_nodes)
     return Response(generate(genes, snt_file), mimetype='text/event-stream')
 
+
 @app.route("/tableview/")
 def tableview():
     genes_url=request.args.get('genequery')
     rnd_url=request.args.get('rnd')
     tf_path=tempfile.gettempdir()
+
     if ('email' in session):
         filename = rnd_url.split("_0_")[0]
         genes_session_tmp = datadir+"/user/"+str(session['hashed_email'])+"/"+rnd_url+"/"+filename
         gene_url_tmp = "/user/"+str(session['hashed_email'])+"/"+rnd_url
+
         try:
             with open(datadir+gene_url_tmp+"/nodes.json") as jsonfile:
                 jnodes = json.load(jsonfile)
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
         jedges =''
         file_edges = open(datadir+gene_url_tmp +'/edges.json', 'r')
         for line in file_edges.readlines():
@@ -488,7 +990,11 @@ def tableview():
                 jnodes = json.load(jsonfile)
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
         jedges =''
         file_edges = open(gene_url_tmp +'/edges.json', 'r')
         for line in file_edges.readlines():
@@ -511,14 +1017,17 @@ def tableview():
     gene_name = gene_name+added
     num_gene = gene_name.count(',')+1
 
-    message3="<b> Actions: </b><li> <font color=\"#E74C3C\">Click on the abstract count to read sentences linking the keyword and the gene</font> <li> Click on a gene to search its relations with top 200 addiction genes. <li> Click on a keyword to see the terms included in the search. <li>View the results in <a href='\\cytoscape/?rnd={}&genequery={}'\ ><b> a graph.</b></a>".format(rnd_url,genes_url)
+    message3="<ul><li> <font color=\"#E74C3C\">Click on the abstract count to read sentences linking the keyword and the gene</font>  <li> Click on a keyword to see the terms included in the search. <li>View the results in <a href='\\cytoscape/?rnd={}&genequery={}'\ ><b> a graph.</b></a> </ul> Links will be preserved when the table is copy-n-pasted into a spreadsheet.".format(rnd_url,genes_url)
     return render_template('tableview.html', genes_session_tmp = genes_session_tmp, nodata_temp=nodata_temp, num_gene=num_gene, jedges=jedges, jnodes=jnodes,gene_name=gene_name, message3=message3, rnd_url=rnd_url, genes_url=genes_url)
 
+
+# Table for the zero abstract counts
 @app.route("/tableview0/")
 def tableview0():
     genes_url=request.args.get('genequery')
     rnd_url=request.args.get('rnd')
     tf_path=tempfile.gettempdir()
+
     if ('email' in session):
         filename = rnd_url.split("_0_")[0]
         genes_session_tmp = datadir+"/user/"+str(session['hashed_email'])+"/"+rnd_url+"/"+filename
@@ -528,7 +1037,12 @@ def tableview0():
                 jnodes = json.load(jsonfile)
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
         jedges =''
         file_edges = open(datadir+gene_url_tmp+'/edges.json', 'r')
         for line in file_edges.readlines():
@@ -547,7 +1061,12 @@ def tableview0():
                 jnodes = json.load(jsonfile)
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
         jedges =''
         file_edges = open(gene_url_tmp+'/edges.json', 'r')
         for line in file_edges.readlines():
@@ -565,25 +1084,38 @@ def tableview0():
         added = ",..."
     else:
         added = ""
+
     gene_name = str(genename)[1:]
     gene_name=gene_name[:-1]
     gene_name=gene_name.replace("'","")
     gene_name = gene_name+added
     num_gene = gene_name.count(',')+1
-    message4="<b> Notes: </b><li> These are the keywords that have <b>zero</b> abstract counts. <li>View all the results in <a href='\\cytoscape/?rnd={}&genequery={}'><b> a graph.</b></a>".format(rnd_url,genes_url)
+    message4="<b> Notes: </b><li> These are the keywords that have <b>zero</b> abstract counts. <li>View all the results in <a href='\\cytoscape/?rnd={}&genequery={}'><b> a graph.</b></a> ".format(rnd_url,genes_url)
     return render_template('tableview0.html',nodata_temp=nodata_temp, num_gene=num_gene, jedges=jedges, jnodes=jnodes,gene_name=gene_name, message4=message4)
+
 
 @app.route("/userarchive")
 def userarchive():
+    onto_len_dir = 0
+    onto_list = ''
+    onto_cont=open("addiction.onto","r").read()
+    dict_onto=ast.literal_eval(onto_cont)
+
     if ('email' in session):
         if os.path.exists(datadir+"/user/"+str(session['hashed_email'])) == False:
             flash("Search history doesn't exist!")
-            return render_template('index.html')
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
         else:
             session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
     else:
+        onto_name_archive=''
         flash("You logged out!")
-        return render_template('index.html')
+        onto_len_dir = 0
+        onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
     session_id=session['id']
     def sorted_alphanumeric(data):
         convert = lambda text: int(text) if text.isdigit() else text.lower()
@@ -593,22 +1125,29 @@ def userarchive():
     folder_list = []
     directory_list = []
     gene_list=[]
-    for filename in dirlist:
-        folder_list.append(filename)
-        gene_name = filename.split('_0_')[1]
-        if gene_name[-2:] == '_m':
-            gene_name = gene_name[:-2]
-            gene_name = gene_name + ", ..."
-        gene_name = gene_name.replace('_', ', ')
-        gene_list.append(gene_name)
-        gene_name=""
-        filename=filename[0:4]+"-"+filename[5:7]+"-"+filename[8:13]+":"+filename[14:16]+":"+filename[17:19]
-        directory_list.append(filename)
-    len_dir = len(directory_list)
-    message3="<b> Actions: </b><li> Click on the Date/Time to view archived results.  <li>The Date/Time are based on US Central time zone. "
-    return render_template('userarchive.html', len_dir=len_dir, gene_list = gene_list, folder_list=folder_list, directory_list=directory_list, session_id=session_id, message3=message3)
+    onto_list=[]
 
-# delete this search
+    for filename in dirlist:
+        if ('_0_'  in filename):
+            folder_list.append(filename)
+            gene_name = filename.split('_0_')[1]
+            onto_name = filename.split('_0_')[2]
+            if gene_name[-2:] == '_m':
+                gene_name = gene_name[:-2]
+                gene_name = gene_name + ", ..."
+            gene_name = gene_name.replace('_', ', ')
+            gene_list.append(gene_name)
+            onto_list.append(onto_name)
+            onto_name=""
+            gene_name=""
+            filename=filename[0:4]+"-"+filename[5:7]+"-"+filename[8:13]+":"+filename[14:16]+":"+filename[17:19]
+            directory_list.append(filename)
+    len_dir = len(directory_list)
+    message3="<ul><li> Click on the Date/Time to view archived results. <li>The Date/Time are based on US Central time zone.</ul> "
+    return render_template('userarchive.html', len_dir=len_dir, gene_list = gene_list, onto_list = onto_list, folder_list=folder_list, directory_list=directory_list, session_id=session_id, message3=message3)
+
+
+# Remove the search directory
 @app.route('/remove', methods=['GET', 'POST'])
 def remove():
     if('email' in session):
@@ -617,12 +1156,17 @@ def remove():
         return redirect(url_for('userarchive'))
     else:
         flash("You logged out!")
-        return render_template('index.html')
+        onto_len_dir = 0
+        onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
 
 @app.route('/date', methods=['GET', 'POST'])
 def date():
     select_date = request.args.get('selected_date')
-    #open the cache folder for the user
+    # Open the cache folder for the user
     tf_path=datadir+"/user"
     if ('email' in session):
         time_extension = str(select_date)
@@ -639,7 +1183,7 @@ def date():
         for line in file_edges.readlines():
             if ':' not in line:
                 nodata_temp = 1
-            else: 
+            else:
                 nodata_temp = 0
                 with open(tf_path+"/"+str(session['hashed_email'])+"/"+select_date+"/edges.json", "r") as edgesjsonfile:
                     jedges = json.load(edgesjsonfile)
@@ -661,7 +1205,7 @@ def date():
             gene_name=gene_name.replace("'","")
             gene_name = gene_name+added
             num_gene = gene_name.count(',')+1
-        else: 
+        else:
             gene_name1 = gene_name1.replace("_", ", ")
             gene_name = gene_name1
             num_gene = gene_name1.count(',')+1
@@ -673,8 +1217,12 @@ def date():
         genes_session = genes_session[:-1]
     else:
         flash("You logged out!")
-        return render_template('index.html')
-    message3="<b> Actions: </b><li> <font color=\"#E74C3C\">Click on the abstract count to read sentences linking the keyword and the gene</font> <li> Click on a gene to search its relations with top 200 addiction genes. <li> Click on a keyword to see the terms included in the search. <li>View the results in <a href='\\cytoscape/?rnd={}&genequery={}'\ ><b> a graph.</b></a>".format(select_date,genes_session)
+        onto_len_dir = 0
+        onto_list = ''
+        onto_cont=open("addiction.onto","r").read()
+        dict_onto=ast.literal_eval(onto_cont)
+        return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+    message3="<ul><li> <font color=\"#E74C3C\">Click on the abstract count to read sentences linking the keyword and the gene</font> <li> Click on a keyword to see the terms included in the search. <li>View the results in <a href='\\cytoscape/?rnd={}&genequery={}'\ ><b> a graph.</b></a> </ul> Links will be preserved when the table is copy-n-pasted into a spreadsheet.".format(select_date,genes_session)
     return render_template('tableview.html',nodata_temp=nodata_temp, num_gene=num_gene,genes_session_tmp = genes_session_tmp, rnd_url=select_date ,jedges=jedges, jnodes=jnodes,gene_name=gene_name, genes_url=genes_session, message3=message3)
 
 @app.route('/cytoscape/')
@@ -683,8 +1231,9 @@ def cytoscape():
     rnd_url=request.args.get('rnd')
     tf_path=tempfile.gettempdir()
     genes_session_tmp=tf_path + "/" + genes_url
-
-    message2="<b> Actions: </b><li><font color=\"#E74C3C\">Click on a line to see the indicated number of abstracts </font> <li> Click on a gene to search its relations with top 200 addiction genes<li>Click on a keyword to see the terms included in the search<li>Hover your pointer over a node to hide other links <li>Move nodes around to adjust visibility, reload the page to restore the default layout<li>View the results in <a href='\\tableview/?rnd={}&genequery={}'\ ><b>a table. </b></a> <li>All results will appear in a new Browser window (or tab)".format(rnd_url,genes_url)
+    rnd_url_tmp=tf_path +"/" + rnd_url
+    message2="<ul><li><font color=\"#E74C3C\">Click on a line to read the sentences </font> <li>Click on a keyword to see the terms included in the search<li>Hover a pointer over a node to hide other links <li>Move the nodes around to adjust visibility <li> Reload the page to restore the default layout<li>View the results in <a href='\\tableview/?rnd={}&genequery={}'\ ><b>a table. </b></a></ul>".format(rnd_url,genes_url)
+    
     if ('email' in session):
         filename = rnd_url.split("_0_")[0]
         rnd_url_tmp = datadir+"/user/"+str(session['hashed_email'])+"/"+rnd_url+"/"+filename
@@ -693,7 +1242,12 @@ def cytoscape():
                 elements=f.read()
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
         with open(rnd_url_tmp+"_0link","r") as z:
             zeroLink=z.read()
             if (len(zeroLink)>0):
@@ -701,16 +1255,23 @@ def cytoscape():
     else:
         rnd_url_tmp=tf_path +"/" + rnd_url
         try:
+            rnd_url_tmp.replace("\"", "")
             with open(rnd_url_tmp+"_cy","r") as f:
                 elements=f.read()
         except FileNotFoundError:
             flash("You logged out!")
-            return render_template('index.html')
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
+
         with open(rnd_url_tmp+"_0link","r") as z:
             zeroLink=z.read()
             if (len(zeroLink)>0):
                 message2+="<span style=\"color:darkred;\">No result was found for these genes: " + zeroLink + "</span>"
     return render_template('cytoscape.html', elements=elements, message2=message2)
+
 
 @app.route("/sentences")
 def sentences():
@@ -733,6 +1294,7 @@ def sentences():
     pmid_string=''
     edge=request.args.get('edgeID')
     (tf_name, gene0, cat0)=edge.split("|")
+
     if(cat0=='stress'):
         model = create_model(23154, 64)
         model.load_weights("./nlp/weights.ckpt")
@@ -744,6 +1306,7 @@ def sentences():
     stress_systemic = "<b></ol>Sentence(s) describing systemic stress (classified using a deep learning model):</b><hr><ol>"
     with open(tf_name, "r") as df:
         all_sents=df.read()
+
     for sent in all_sents.split("\n"):
         if len(sent.strip())!=0:
             (gene,nouse,cat, pmid, text)=sent.split("\t")
@@ -776,20 +1339,33 @@ def sentences():
         out = out1 +out2+stress_cellular+out_neg
     K.clear_session()
     return render_template('sentences.html', sentences="<ol>"+out+"</ol><p>")
-## show the cytoscape graph for one gene from the top gene list
+
+
+# Show the cytoscape graph for one gene from the top gene list
 @app.route("/showTopGene")
 def showTopGene():
     query=request.args.get('topGene')
-    nodesEdges=searchArchived('topGene',query, 'cys')
+    nodesEdges=searchArchived('topGene',query, 'cys','','')[0]
     message2="<li><strong>"+query + "</strong> is one of the top addiction genes. <li> An archived search is shown. Click on the blue circle to update the results and include keywords for brain region and gene function. <strong> The update may take a long time to finish.</strong> "
     return render_template("cytoscape.html", elements=nodesEdges, message="Top addiction genes", message2=message2)
+
 
 @app.route("/shownode")
 def shownode():
     node=request.args.get('node')
-    allnodes={**brain_d, **drug_d, **function_d, **addiction_d, **stress_d, **psychiatric_d}
-    out="<p>"+node.upper()+"<hr><li>"+ allnodes[node].replace("|", "<li>")
+    if 'namecat' in session:
+        file2 = open(session['namecat']+".onto","r")
+        onto_cont=file2.read()
+        dict_onto=ast.literal_eval(onto_cont)
+        for ky in dict_onto.keys():
+            if node in dict_onto[ky].keys():
+                out="<p>"+node.upper()+"<hr><li>"+ next(iter(dict_onto[ky][node])).replace("|", "<li>")
+    else:
+        for ky in dictionary.keys():
+            if node in dictionary[ky].keys():
+                out="<p>"+node.upper()+"<hr><li>"+ next(iter(dictionary[ky][node])).replace("|", "<li>")
     return render_template('sentences.html', sentences=out+"<p>")
+
 
 @app.route("/synonyms")
 def synonyms():
@@ -807,7 +1383,6 @@ def synonyms():
         return render_template('genenames.html', case = case, gene = node.upper(), synonym_list = synonym_list, synonym_list_str=synonym_list_str)
     except:
         try:
-         #if(node in session['synonym_list']):
             synonym_list = session['synonym_list']
             synonym_list_str = ';'.join([str(syn) for syn in synonym_list]) 
             synonym_list_str +=';' + node
@@ -817,23 +1392,25 @@ def synonyms():
             case = 2
             return render_template('genenames.html', gene = node, case = case)
 
+
 @app.route("/startGeneGene")
 def startGeneGene():
     session['forTopGene']=request.args.get('forTopGene')
     return render_template('progress.html', url_in="searchGeneGene", url_out="showGeneTopGene")
 
+
 @app.route("/searchGeneGene")
 def gene_gene():
     tmp_ggPMID=session['path']+"_ggPMID"
-    gg_file=session['path']+"_ggSent" #gene_gene
+    gg_file=session['path']+"_ggSent" # Gene_gene
     result_file=session['path']+"_ggResult"
+
     def generate(query):
         progress=1
         yield "data:"+str(progress)+"\n\n"
         os.system("esearch -db pubmed -query \"" +  query + "\" | efetch -format uid |sort >" + tmp_ggPMID)
         abstracts=os.popen("comm -1 -2 topGene_uniq.pmid " + tmp_ggPMID + " |fetch-pubmed -path "+pubmed_path+ " | xtract -pattern PubmedArticle -element MedlineCitation/PMID,ArticleTitle,AbstractText|sed \"s/-/ /g\"").read()
         os.system("rm "+tmp_ggPMID)
-        #abstracts = os.popen("esearch -db pubmed -query " +  query + " | efetch -format uid |fetch-pubmed -path "+ pubmed_path + " | xtract -pattern PubmedArticle -element MedlineCitation/PMID,ArticleTitle,AbstractText|sed \"s/-/ /g\"").read()
         progress=10
         yield "data:"+str(progress)+"\n\n"
         topGenes=dict()
@@ -846,6 +1423,7 @@ def gene_gene():
         allAbstracts= abstracts.split("\n")
         abstractCnt=len(allAbstracts)
         rowCnt=0
+
         for row in allAbstracts:
             rowCnt+=1
             if rowCnt/10==int(rowCnt/10):
@@ -884,6 +1462,7 @@ def gene_gene():
                 sentword="sentences"
             topGeneHits[ "<li> <a href=/sentences?edgeID=" + url+ " target=_new>" + "Show " + str(hitGenes[key]) + " " + sentword +" </a> about "+query+" and <a href=/showTopGene?topGene="+key+" target=_gene><span style=\"background-color:#FcF3cf\">"+key+"</span></a>" ]=hitGenes[key]
         topSorted = [(k, topGeneHits[k]) for k in sorted(topGeneHits, key=topGeneHits.get, reverse=True)]
+        
         for k,v in topSorted:
             results+=k
         saveResult=open(result_file, "w+")
@@ -891,9 +1470,11 @@ def gene_gene():
         saveResult.close()
         progress=100
         yield "data:"+str(progress)+"\n\n"
-    ## start the run
+    
+    # Start the run
     query=session['forTopGene']
     return Response(generate(query), mimetype='text/event-stream')
+
 
 @app.route('/showGeneTopGene')
 def showGeneTopGene ():
@@ -901,11 +1482,13 @@ def showGeneTopGene ():
         results=result_f.read()
     return render_template('sentences.html', sentences=results+"<p><br>")
 
-## generate a page that lists all the top 150 addiction genes with links to cytoscape graph.
+
+# Generate a page that lists all the top 150 addiction genes with links to cytoscape graph.
 @app.route("/allTopGenes")
 def top150genes():
     return render_template("topAddictionGene.html")
 
+
 if __name__ == '__main__':
     db.create_all()
-    app.run(debug=True, port=4201)
+    app.run(debug=True, port=4200)

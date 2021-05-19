@@ -60,17 +60,20 @@
     var cell = row.insertCell(1);
     cell.innerHTML = "<b>GENES</b>";
     var cell = row.insertCell(2);
+    cell.innerHTML = "<b>ONTOLOGY</b>";
+    var cell = row.insertCell(3);
     cell.innerHTML = "<b>Delete</b>";
 
     var i=0;
     {%for i in range(0,len_dir)%}
             var x=document.getElementById('myRecords').insertRow(1);
             var y= x.insertCell(0);
-
             y.innerHTML='<a href="{{url_for('date', selected_date=folder_list[i])}}">{{directory_list[i]}}</a>';
             y= x.insertCell(1);
             y.innerHTML='{{gene_list[i]}}'; 
             y= x.insertCell(2);
+            y.innerHTML='{{onto_list[i]}}'; 
+            y= x.insertCell(3);
             y.innerHTML='<a href="{{url_for('remove', remove_folder=folder_list[i])}}">Delete this search</a>';
     {% endfor %}
 }

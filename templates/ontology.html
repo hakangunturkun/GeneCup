@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block content %}
+{{ message | safe }}
+
+<h2> Custom Ontology Editor</h2>
+
+<p>The custom ontology has four layers. The <b>top layer</b> is one single keyword serves as the name of the ontology. This keyword is used to select the  ontology used for each search (i.e. via the dropdown menu). <i>A new ontology will be created if the ontology does not already exist for the use</i>. Keywords in the <b>second layer</b> describe the main concepts and are used to include/exclude groups of keywords for each search (via check boxes). All keywords under the same second layer are shown with the same color in the graphic output.  Keywords in the <b>third layer</b> are shown in the results (both graphic and tabular). Keywords in the <b>fourth layer</b> are synonyms of those in the third layer. Results from all synonyms are grouped together and shown under the parent third layer keyword. </p>
+
+{%if "name" in session %}
+	<b>{{session['name']}}</b>, your ontologies are available in the <a href="/ontoarchive"> archive </a>.
+{% else %}
+	The ontologies will be saved after login.
+{% endif %}
+
+{%if "email" in session %}
+	<form action="/ontology">
+		<div id="onto_selection">The following ontologies are available:</div>
+		<button type="submit" class="btn btn-primary btn btn-info">Select</button>
+	</form>
+{%else%}
+	Custom ontologies are available after <b>login</b>. 
+{% endif %}
+
+<table>
+<form action="/ontology" method="POST">
+	<tr>
+		{%if "namecat" in session %}
+		<p>
+			<div class="panel-title"><b>Add or remove keywords from the <u>{{namecat}}</u> ontology</b> </div>
+		{% else %}
+			<div class="panel-title"><b>Fill out the fields below to add or remove keywords from the ontology. </b> </div>
+		{% endif %}
+	</tr>
+		<td style="width:30%; vertical-align:top">
+			<div id="div_id_namecat" class="form-group required" style="margin-top: 10%; width: 80%" >
+				<label for="maincat"  ><b>Layer 1.</b> Name of the ontology (e.g. <i>addiction</i>) </label>
+				{%if "namecat" in session %}
+					<input class="input-md  textinput textInput form-control" id="namecat" name="namecat" value="{{namecat}}" placeholder="name" style="margin-bottom: 5%" required />
+				{% else %}
+					<input class="input-md  textinput textInput form-control" id="namecat" name="namecat" placeholder="name" style="margin-bottom: 5%" required/>
+				{% endif %}
+			</div>
+
+			<div id="div_id_firstcat" class="form-group required" style="width: 80%">
+				<label for="maincat"><b>Layer 2.</b> Main category (e.g. <i>brain region</i> ) </label>
+				<input class="input-md  textinput textInput form-control" id="maincat" name="maincat" placeholder="main category" style="margin-bottom: 5%" required/>
+			</div>
+
+			<div id="div_id_secondcat" class="form-group required" style="width: 80%">
+				<label for="subcat"><b>Layer 3.</b> Keywords shown in results (e.g. <i> accumbens</i>) </label>
+				<input class="input-md  textinput textInput form-control" id="subcat" name="subcat" placeholder="subcategory" style="margin-bottom: 5%" required/>
+			</div>
+
+			<div id="div_id_thirdcat" class="form-group required">
+				<label for="keycat"><b>Layer 4.</b> Synonyms (e.g. <i>accumbal, AcbC, AcbS, NAcc <i> )  </label>
+				<textarea name="keycat" class="form-control form-control-lg" id="keycat" type="search" rows="4"  id="searchform" required></textarea>
+			</div>
+
+			<div class="form-group"> 
+				<button type="submit" name="submit" style="width: 40%" value="add" class="btn btn-primary btn btn-info" id="submit-id-signup" >Add</button>
+				<button type="submit" style="width: 40%" name="submit" value="remove" class="btn btn-primary btn btn-info" id="submit-id-signup">Remove</button>				
+			</div>
+		</td>
+
+	<td style="width:45%; vertical-align:top">
+			<h3 style= "margin-top:5%; margin-left:5%">Ontology: {{namecat}}</h3>
+			<br>
+			{%for ky in dict_onto.keys()%}
+				<p style="margin-left:10%">
+				<b>{{ky}}:</b> <p/style>
+				{%for subky in dict_onto[ky].keys()%}
+					<ul><li>{{subky}}
+					<br>
+					<p style="text-indent: 5%;"> {{(((dict_onto[ky][subky]|string()).split('|'))|string()).replace('\"{','').replace('}\"','').replace('\"','\'').replace('[','').replace(']','').replace('\'','')}} </p>
+					</ul><hr>
+				{%endfor%}
+			{%endfor%}
+	</td>
+</form>
+</table>
+
+
+
+
+{%if "name" in session %}
+<script>
+	var newdiv = document.createElement('div');
+	var i=0
+	var options = '<option>select your ontology</option>';
+	options += "<option>addiction</option>";
+	{%for i in range(0,onto_len_dir)%}
+		  options += "<option>{{onto_list[i]}}</option>";
+  	{% endfor %}
+	newdiv.innerHTML = "<select name='onto' id='onto'> "+options + " </select> ";
+	document.getElementById('onto_selection').appendChild(newdiv);
+  </script>
+  {% endif %}
+
+
+
+
+{% endblock %}

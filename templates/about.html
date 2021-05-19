@@ -2,26 +2,43 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<h3> About RatsPub </h3>
+<div class="row">
+    <div class="col-md-9">
+        <h3> About GeneCup </h3>
+        <hr>
+
+        <p>GeneCup searches PubMed to find abstracts containing genes of interest and keywords in the custom ontologies. 
+            The title and abstracts corresponding to the PMIDs are then retrieved from a 
+            <a href="https://dataguide.nlm.nih.gov/edirect/archive.html">local archive of the PubMed</a>. 
+            No limit on the date of publication is set. Each abstract is then broken down into sentences, 
+            which are then filtered by gene names and keywords. We also parse the GWAS catalog to obtain 
+            genetics associations with the keywords of the custom ontology.
+
+        <p>A list of curated <a href="/ontology">addiction-related keywords</a> can be used to search 
+            addiction-related genes. We compiled the most studied 100 addiction related genes 
+            by searching 29,761 human genes against addiction related keywords. 
+            To ensure comprehensive coverage, gene alias obtained from NCBI gene database were included in the search. 
+            The results were extensively curated to remove over 900 alias that matched words 
+            that were not gene name or wrong genes. Some incorrect results remained because the same name 
+            also produced correct results. The resulting 61,000 sentences are archived localy and can be accessed 
+            via the <a href="/allTopGenes">Addiction Genes</a> link.  We also archived  5.3 million PMIDs 
+            associated with these gene for efficient search of query gene to addiction gene relations. 
+            We obtain 23,000 genetics associations with the addiction and psychiatric phenotypes from GWAS catalog. 
+            These results are included in the search by default.
+            
+        <p> We plan to update the local PubMed archive daily and the EBI GWAS catalog quarterly.
+
+    </div>
+        <div class="col-md-3">
+            <div class='img'><img src="/static/black_logo.png" class="img-fluid"></div>
+    </div>
+</div>
 <hr>
 
-<p>RatsPub searches PubMed to find abstracts containing genes of interest and a list of curated addiction-related keywords. The abstracts corresponding to these returned PMIDs are then retrieve from a <a href="https://dataguide.nlm.nih.gov/edirect/archive.html">local archive of the PubMed</a>. No limit on the date of publication is set. Each abstract is then broken down into sentences, which are then filtered by gene names and keywords. 
-
-<p>Clicking  the links will bring up the corresponding sentences in a new browser window. Clicking the keywords will bring up the correponding search terms. Clicking the genes will start a new search to find sentences containing the target gene and the top 200 addiction genes. 
-
-<p> The top 200 addiction genes were obtained by searching 29,761 human genes against addiction related keywords. To ensure comprehensive coverage, gene alias obtained from NCBI gene database were included in the search. The results were extensively curated to remove over 900 alias that matched words that were not gene name or wrong genes. Some incorrect results remained because the same name also produced correct results. The resulting 61,000 sentences are archived localy and can be accessed via the <a href="/allTopGenes">Addiction Genes</a> link.  We also archived  5.3 million PMIDs associatd with these gene for efficient search of query gene to addiction gene relations. 
-
-<p> We also parsed the EBI GWAS catalog to obtain 23,000 genetics associations with addiction and psychiatric phenotypes. These results are included in the search by default.
-	
-<p> 
-We plan to update the local PubMed archive daily, the intermediate search results weekly and the EBI GWAS catalog quarterly.
-
-<hr>
-<a href="https://github.com/chen42/ratspub"> Source code </a>
+<a href="https://www.biorxiv.org/content/10.1101/2020.09.17.297358v3"> BioRxiv Manuscript </a>
+<p> <a href="https://github.com/chen42/ratspub"> Source code </a>
 
 
 {% endblock %}
-
-
 
 

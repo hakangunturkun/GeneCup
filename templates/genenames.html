@@ -4,9 +4,6 @@
 
 <h2> {{gene}} </h2>
 <hr>
-<h4>Relationship with top addiction genes</h4>
-<ul><li><a href=" /startGeneGene?forTopGene=+ {{gene}}" >{{gene}} vs top addiction genes </a> </ul>
-
 <h4>Synonyms</h4>
 <p>The following synonyms are found in the database. You can follow the links to search individual names or all of them at once. 
 <br>
@@ -14,16 +11,15 @@
 
 <br>
 <ul>
-    <li> <a href=http://rats.pub/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=function&query={{synonym_list_str}}>Search all synonyms </a>  
+    <li> <a href=/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=cell&type=function&query={{synonym_list_str}}>Search all synonyms </a>  
 {%if case == 1%}
     {%for syn in synonym_list%}
-
-	<li>	<a href=http://rats.pub/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=function&query={{syn}}>{{syn.replace("-", " ")}}</a>
+        <li> <a href=/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=cell&type=function&query={{syn}}>{{syn.replace("-", " ")}}</a>
     {%endfor%}
-</ul>
+    </ul>
     <br>
-{%else%}
-    No synonym for {{gene}} is found. 
+    {%else%}
+        No synonym for {{gene}} is found. 
 {%endif%} 
 <br>
 {% endblock %}

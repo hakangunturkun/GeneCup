@@ -62,3 +62,13 @@ a:active {
 .loginout {
   color: black
 }
+
+.inval {
+  font-size: 1.3rem;
+  font-weight: 80;
+  color:red
+}
+
+ul {
+  margin-left:40px;
+}
