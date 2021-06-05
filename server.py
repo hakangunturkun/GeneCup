@@ -140,10 +140,13 @@ def login():
             session['name'] = found_user.name
             session['id'] = found_user.id
             flash("Login Succesful!")
+            ontoarchive()
+            onto_len_dir = session['onto_len_dir']
+            onto_list = session['onto_list']
         else:
             flash("Invalid username or password!", "inval")
             return render_template('signup.html')
- 
+    print(onto_list)
     return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
 
 
@@ -169,13 +172,15 @@ def signup():
         session['name'] = name
         password = bcrypt.hashpw(password.encode('utf8'), bcrypt.gensalt())
         user = users(name=name, email=email, password = password)       
-
         if found_user:
             session['email'] = found_user.email
             session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
             session['id'] = found_user.id
             found_user.name = name
             db.session.commit()
+            ontoarchive()
+            onto_len_dir = session['onto_len_dir']
+            onto_list = session['onto_list']
         else:
             db.session.add(user)
             db.session.commit()
@@ -204,13 +209,16 @@ def signin():
 
         if (found_user and (bcrypt.checkpw(password.encode('utf8'), found_user.password))):
             session['email'] = found_user.email
-            session['hashed_email'] = hashlib.md5(session['email'] .encode('utf-8')).hexdigest()
+            session['hashed_email'] = hashlib.md5(session['email'].encode('utf-8')).hexdigest()
             session['name'] = found_user.name
             session['id'] = found_user.id
             flash("Login Succesful!")
-            onto_len_dir = 0
-            onto_list = ''
+            #onto_len_dir = 0
+            #onto_list = ''
             onto_cont=open("addiction.onto","r").read()
+            ontoarchive()
+            onto_len_dir = session['onto_len_dir']
+            onto_list = session['onto_list']
             dict_onto=ast.literal_eval(onto_cont)
             return render_template('index.html', onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
         else:
@@ -741,7 +749,6 @@ def progress():
 
     for gen in genes:
         genes_session += str(gen) + "_"
-
     genes_session = genes_session[:-1]
     session['query']=genes
     return render_template('progress.html', url_in="search", url_out="cytoscape/?rnd="+rnd+"&genequery="+genes_session)
@@ -750,12 +757,12 @@ def progress():
 @app.route("/search")
 def search():
     genes=session['query']
-    percent_ratio=len(genes)
+    percent_ratio=len(genes)+1
 
     if(len(genes)==1):
         percent_ratio=2
     timeextension=session['timeextension']
-    percent=round(100/percent_ratio*8,1) # 7 categories + 1 at the beginning
+    percent=round(100/percent_ratio,1)-1 # 7 categories + 1 at the beginning
 
     if ('email' in session):
         sessionpath = session['path_user'] + timeextension
@@ -777,7 +784,6 @@ def search():
     nodecolor={}
     nodecolor['GWAS'] = "hsl(0, 0%, 70%)"
     nodes_list = []
-    nodes_list_for_gwas = []
 
     if 'namecat' in session:
         namecat_flag=1
@@ -786,8 +792,6 @@ def search():
         dict_onto=ast.literal_eval(onto_cont)
 
         for ky in dict_onto.keys():
-            for nd_g in dict_onto[ky]:
-                nodes_list_for_gwas.append(nd_g)
             nodecolor[ky] = "hsl("+str((n_num+1)*int(360/len(dict_onto.keys())))+", 70%, 80%)"
             d["nj{0}".format(n_num)]=generate_nodes_json(dict_onto[ky],str(ky),nodecolor[ky])
             n_num+=1
@@ -802,8 +806,6 @@ def search():
     else:
         namecat_flag=0
         for ky in dictionary.keys():
-            for nd_g in dictionary[ky]:
-                nodes_list_for_gwas.append(nd_g)
             nodecolor[ky] = "hsl("+str((n_num+1)*int(360/len(dictionary.keys())))+", 70%, 80%)"
             d["nj{0}".format(n_num)]=generate_nodes_json(dictionary[ky],str(ky),nodecolor[ky])
             n_num+=1
@@ -826,9 +828,8 @@ def search():
             progress=0
             searchCnt=0
             nodesToHide=str()
-            json_edges = str()
-            progress+=percent            
-            genes_or = ' or '.join(genes)
+            json_edges = str()           
+            #genes_or = ' [tiab] or '.join(genes)
             all_d=''
 
             if namecat_flag==1:
@@ -837,7 +838,6 @@ def search():
 
                 for ky in dict_onto.keys():
                     if (ky in search_type):
-                        ls_plural = list(dict_onto[ky].values())
                         all_d_ls=undic(list(dict_onto[ky].values()))
                         all_d = all_d+'|'+all_d_ls
             else:
@@ -846,23 +846,24 @@ def search():
                         all_d_ls=undic(list(dictionary[ky].values()))
                         all_d = all_d+'|'+all_d_ls
             all_d=all_d[1:]
-            abstracts_raw = getabstracts(genes_or,all_d)
+            if ("GWAS" in search_type):
+                datf = pd.read_csv('./utility/gwas_used.csv',sep='\t')
             progress+=percent
-            sentences_ls=[]
-
-            for row in abstracts_raw.split("\n"):
-                tiab=row.split("\t")
-                pmid = tiab.pop(0)
-                tiab= " ".join(tiab)
-                sentences_tok = sent_tokenize(tiab)
-                for sent_tok in sentences_tok:
-                    sent_tok = pmid + ' ' + sent_tok
-                    sentences_ls.append(sent_tok)
+            yield "data:"+str(progress)+"\n\n"
             for gene in genes:
+                abstracts_raw = getabstracts(gene,all_d)
+                sentences_ls=[]
+
+                for row in abstracts_raw.split("\n"):
+                    tiab=row.split("\t")
+                    pmid = tiab.pop(0)
+                    tiab= " ".join(tiab)
+                    sentences_tok = sent_tokenize(tiab)
+                    for sent_tok in sentences_tok:
+                        sent_tok = pmid + ' ' + sent_tok
+                        sentences_ls.append(sent_tok)
                 gene=gene.replace("-"," ")
-                # report progress immediately
-                progress+=percent
-                yield "data:"+str(progress)+"\n\n"
+                
                 geneEdges = ""
 
                 if namecat_flag==1:
@@ -872,53 +873,58 @@ def search():
                     dict_onto = dictionary
 
                 for ky in dict_onto.keys():
-                    if (ky=='addiction') and ('addiction' in dict_onto.keys())\
-                        and ('drug' in dict_onto.keys()) and ('addiction' in dict_onto['addiction'].keys())\
-                        and ('aversion' in dict_onto['addiction'].keys()) and ('intoxication' in dict_onto['addiction'].keys()):
-                        #addiction terms must present with at least one drug
-                        addiction_flag=1
-                        #addiction=undic0(addiction_d) +") AND ("+undic0(drug_d)
-                        sent=gene_category(gene, addiction_d, "addiction", sentences_ls,addiction_flag,dict_onto)
-                        if ('addiction' in search_type):
-                            geneEdges += generate_edges(sent, tf_name)
-                            json_edges += generate_edges_json(sent, tf_name)
-                    else:
-                        addiction_flag=0
-                        if namecat_flag==1:
-                            onto_cont = open(ses_namecat+".onto","r").read()
-                            dict_onto=ast.literal_eval(onto_cont)
-                            #ky_d=undic(list(dict_onto[ky].values()))    
-                            sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
-                            
+                    if (ky in search_type):
+                        if (ky=='addiction') and ('addiction' in dict_onto.keys())\
+                            and ('drug' in dict_onto.keys()) and ('addiction' in dict_onto['addiction'].keys())\
+                            and ('aversion' in dict_onto['addiction'].keys()) and ('intoxication' in dict_onto['addiction'].keys()):
+                            #addiction terms must present with at least one drug
+                            addiction_flag=1
+                            #addiction=undic0(addiction_d) +") AND ("+undic0(drug_d)
+                            sent=gene_category(gene, addiction_d, "addiction", sentences_ls,addiction_flag,dict_onto)
+                            if ('addiction' in search_type):
+                                geneEdges += generate_edges(sent, tf_name)
+                                json_edges += generate_edges_json(sent, tf_name)
                         else:
-                            ky_d=undic(list(dict_onto[ky].values()))
-                            sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
-                        progress+=percent
-                        yield "data:"+str(progress)+"\n\n"
-                        if (ky in search_type):
+                            addiction_flag=0
+                            if namecat_flag==1:
+                                onto_cont = open(ses_namecat+".onto","r").read()
+                                dict_onto=ast.literal_eval(onto_cont)
+                                #ky_d=undic(list(dict_onto[ky].values()))    
+                                sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
+                            
+                            else:
+                                #ky_d=undic(list(dict_onto[ky].values()))
+                                sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
+                            yield "data:"+str(progress)+"\n\n"
+                            
                             geneEdges += generate_edges(sent, tf_name)
                             json_edges += generate_edges_json(sent, tf_name)                
-                    sentences+=sent
+                        sentences+=sent
                 if ("GWAS" in search_type):
                     gwas_sent=[]
-                    for nd in nodes_list_for_gwas:
-                        gwas_text=''
-                        datf = pd.read_csv('./utility/gwas_used.csv',sep='\t')
-                        datf_sub = datf[datf['DISEASE/TRAIT'].str.contains(nd,regex=False, case=False, na=False)
-                            & (datf['REPORTED GENE(S)'].str.contains(gene,regex=False, case=False, na=False)
-                            | (datf['MAPPED_GENE'].str.contains(gene,regex=False, case=False, na=False)))]
-                        
-                        if not datf_sub.empty:
-                            for index, row in datf_sub.iterrows():
-                                gwas_text = "SNP:<b>"+str(row['SNPS'])+"</b>, P value: <b>"+str(row['P-VALUE'])\
-                                    +"</b>, Disease/trait:<b> "+str(row['DISEASE/TRAIT'])+"</b>, Mapped trait:<b> "\
-                                    +str(row['MAPPED_TRAIT'])+"</b><br>"
-                                gwas_sent.append(gene+"\t"+"GWAS"+"\t"+nd+"_GWAS\t"+str(row['PUBMEDID'])+"\t"+gwas_text)
+                    datf_sub1 = datf[datf['REPORTED GENE(S)'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE)
+                                    | (datf['MAPPED_GENE'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE))]
+                    for nd2 in dict_onto['GWAS'].keys():
+                        for nd1 in dict_onto['GWAS'][nd2]:    
+                            for nd in nd1.split('|'):
+                                gwas_text=''
+                                datf_sub = datf_sub1[datf_sub1['DISEASE/TRAIT'].str.contains('(?:\s|^)'+nd+'(?:\s|$)', flags=re.IGNORECASE)]
+                                    #& (datf['REPORTED GENE(S)'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE)
+                                    #| (datf['MAPPED_GENE'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE)))]
+                                if not datf_sub.empty:
+                                    for index, row in datf_sub.iterrows():
+                                        gwas_text = "SNP:<b>"+str(row['SNPS'])+"</b>, P value: <b>"+str(row['P-VALUE'])\
+                                            +"</b>, Disease/trait:<b> "+str(row['DISEASE/TRAIT'])+"</b>, Mapped trait:<b> "\
+                                            +str(row['MAPPED_TRAIT'])+"</b><br>"
+                                        gwas_sent.append(gene+"\t"+"GWAS"+"\t"+nd+"_GWAS\t"+str(row['PUBMEDID'])+"\t"+gwas_text)
                     cys, gwas_json, sn_file = searchArchived('GWAS', gene , 'json',gwas_sent, path_user)
                     with open(path_user+"gwas_results.tab", "w") as gwas_edges:
                         gwas_edges.write(sn_file)
                     geneEdges += cys
                     json_edges += gwas_json  
+                # report progress immediately
+                progress+=percent
+                yield "data:"+str(progress)+"\n\n"
                                     
                 if len(geneEdges) >0:
                     edges+=geneEdges

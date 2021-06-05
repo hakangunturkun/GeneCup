@@ -47,3 +47,13 @@ cell_d={'neuron':'adrenergic neurons*|cholinergic neurons*|dopaminergic neurons*
 stress_d={'PTSD':'PTSD|post traumatic stress|post traumatic stress symptoms*|post traumatic stress disorder',
 'stress':'distress|psychological trauma|stress'}
 
+GWAS_d={'psychiatric':'psychiatric|schizophrenia|autism|depression|anxiety|bipolar|mental',
+'nicotine':'nicotine|smoking|chronic obstructive|tobacco',
+'addiction':'addiction|cocaine|opioid|morphine|amphetamine|methadone|heroin|drug dependence',
+'alcohol':'alcohol'}
+
+
+
+
+
+

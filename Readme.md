@@ -1,6 +1,6 @@
 # GeneCup: Mining gene relationships from PubMed using custom ontology
 
-URL: [http://genecup.org](http://genecup.org)
+URL: [https://genecup.org](https://genecup.org)
 
 GeneCup automatically extracts information from PubMed and NHGRI-EBI GWAS catalog on the relationship of any gene with a custom list of keywords hierarchically organized into an ontology. The users create an ontology by identifying categories of concepts and a list of keywords for each concept. 
 

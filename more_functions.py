@@ -29,18 +29,25 @@ def getabstracts(gene,query):
         query2 = query+"s*"
     query3 = query2.replace("s|", "s* OR ")
     query4 = query3.replace("|", "s* OR ")
-    query="\"(" + query4 + ") AND " + gene + "\""
+    
+    #query4=query
+    #query="\"(" + query4 + ") AND ((" + gene + "[tiab]) or (" + gene + "[meSH]))\""
+    query="\"(" + query4 + ") AND (" + gene + " [tiab])\""
+    #query = "neurons* AND (penk [tiab])"
     abstracts = os.popen("esearch -db pubmed -query " +  query \
         + " | efetch -format uid |fetch-pubmed -path "+ pubmed_path \
         + " | xtract -pattern PubmedArticle -element MedlineCitation/PMID,ArticleTitle,AbstractText|sed \"s/-/ /g\"").read()
+    #print(abstracts)
     return(abstracts)
 
 sentences_ls=[]
 def getSentences(gene, sentences_ls):
     out=str()
     # Keep the sentence only if it contains the gene 
+    #print(sentences_ls)
     for sent in sentences_ls:
-        if gene.lower() in sent.lower():
+        #if gene.lower() in sent.lower():
+        if re.search(r'\b'+gene.lower()+r'\b',sent.lower()):
             pmid = sent.split(' ')[0]
             sent = sent.split(' ',1)[1]
             sent=re.sub(r'\b(%s)\b' % gene, r'<strong>\1</strong>', sent, flags=re.I)
@@ -50,18 +57,27 @@ def getSentences(gene, sentences_ls):
 def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
     # e.g. BDNF, addiction_d, undic(addiction_d) "addiction"
     sents=getSentences(gene, abstracts)
+    #print(abstracts)
     out=str()
     if (addiction_flag==1):
         for sent in sents.split("\n"):
             for key in cat_d:
-                if findWholeWord(cat_d[key])(sent) :
+                if key =='s':
+                    key_ad = key+"*"
+                else:
+                    key_ad = key+"s*"
+                if findWholeWord(key_ad)(sent) :
                     sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
-                    sent=re.sub(r'\b(%s)\b' % cat_d[key], r'<b>\1</b>', sent, flags=re.I) # highlight keyword
+                    sent=re.sub(r'\b(%s)\b' % key_ad, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
                     out+=gene+"\t"+ cat + "\t"+key+"\t"+sent+"\n"
     else:
-        for sent in sents.split("\n"):
-            for key_1 in dictn[cat_d].keys():
-                for key_2 in dictn[cat_d][key_1]:
+        for key_1 in dictn[cat_d].keys():
+            for key_2 in dictn[cat_d][key_1]:
+                if key_2[-1] =='s':
+                    key_2 = key_2+"*"
+                else:
+                    key_2 = key_2+"s*"
+                for sent in sents.split("\n"):
                     if findWholeWord(key_2)(sent) :
                         sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
                         sent=re.sub(r'\b(%s)\b' % key_2, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
