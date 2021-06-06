@@ -2,7 +2,7 @@
 {% block content %}
 {{ message | safe }}
 
-<h3> Mining Gene Relationships  from PubMed using  Custom Ontologies </h3>
+<h3> Mining PubMed for Gene Relationships using Custom Ontologies </h3>
 
 <div class="row">
 	<div class="col-md-9">
@@ -14,11 +14,12 @@
 		<!--Gene alias often include non-specific words and are thus not included in the initial search. 
 			However, a list of alias can be found by clicking on the gene symbol in the results section. 
 			These alias then can be searched with a single click. --> 
-		As an example, we present a curated ontology for drug addiction with over <a href="/ontology"> 300 keywords organized into seven categories.
-		</a> A user account (free) is needed to create custom ontologies and save the search results.
+		As an example, we present a curated ontology for drug addiction with over <a href="/ontology"> 300 keywords organized into seven categories.</a> 
+		Furthermore, <b>deep learning </b> is used to distinguish automatically the sentences describing systemic stress from those describing cellular stress. 
+		A user account (free) is needed to create custom ontologies and save the search results.
 		</p>
 
-		<p>Example: </b><a href=/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=cell&type=function&query=Rgma+Nrxn3>Rgma Nrxn3</a>.</p>
+		<p>Example: </b><a href=/progress?type=GWAS&type=addiction&type=drug&type=brain&type=stress&type=psychiatric&type=cell&type=function&query=Rgma+Penk>Rgma Penk</a>.</p>
 		
 		{%if ("name" not in session) %}
 			By default, the <a href="/ontology">addiction</a> ontology is used. Custom ontologies can be created in user accounts. 
@@ -34,14 +35,18 @@
 		{% else %}	
 			Welcome back, <b> {{session['name']}}</b>. Your <a href="/userarchive"> previous searches </a> 
 			and <a href="/ontoarchive"> custom ontologies </a> are available from the links.
-
+			<br>
+			Please select an ontology to use for the new search
 			<form action="/index_ontology">
-				<div id="onto_selection">Please select an ontology to use for the new search</div>
-				<button type="submit" class="btn btn-secondary btn-sm">Select</button>
+				<table><td>
+					<div id="onto_selection"></div>
+				</td><td>
+					<button type="submit" class="btn btn-secondary btn-sm">Select</button>
+				</td></table>
 			</form>
-			
-			The <font color="tomato"> <strong>{{ontol}}</strong> </font> ontology is selected. Please choose categories to be included in the search. 
-			Expect a longer wait time when you include <b>Human GWAS</b> category.
+			<br>
+			The <font size="5em" color="tomato"> <strong>{{ontol}}</strong> </font> ontology is selected. Please choose categories to be included in the search. 
+			Expect a longer wait time when you include <b>GWAS</b> category.
 
 			<form action="/progress">
 				<div id="check_selection"></div>
@@ -69,7 +74,7 @@
 	{%for ky in dict_onto.keys()%}
 		checkbox += '<strong><input type="checkbox" name="type" value="{{ky}}" checked> {{ky}}&nbsp &nbsp </strong>';
 	{% endfor %}
-	checkbox += ' <strong><input type="checkbox" name="type" value="GWAS" checked> Human GWAS&nbsp &nbsp </strong><strong><input type="checkbox" onClick="toggle(this)"/> (Un)select all'
+	checkbox += '<strong><input type="checkbox" onClick="toggle(this)"/> (Un)select all'
 	newdiv.innerHTML = "<inout name='type' id='onto'> "+checkbox + " </input> ";
 	document.getElementById('check_selection').appendChild(newdiv);
 </script>

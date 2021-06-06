@@ -4,7 +4,7 @@
 
 <h2> Custom Ontology Editor</h2>
 
-<p>The custom ontology has four layers. The <b>top layer</b> is one single keyword serves as the name of the ontology. This keyword is used to select the  ontology used for each search (i.e. via the dropdown menu). <i>A new ontology will be created if the ontology does not already exist for the use</i>. Keywords in the <b>second layer</b> describe the main concepts and are used to include/exclude groups of keywords for each search (via check boxes). All keywords under the same second layer are shown with the same color in the graphic output.  Keywords in the <b>third layer</b> are shown in the results (both graphic and tabular). Keywords in the <b>fourth layer</b> are synonyms of those in the third layer. Results from all synonyms are grouped together and shown under the parent third layer keyword. </p>
+<p>The custom ontology has four layers. The <b>top layer</b> is one single keyword serves as the name of the ontology. This keyword is used to select the  ontology used for each search (i.e. via the dropdown menu). <i>A new ontology will be created if the ontology does not already exist for the use</i>. Keywords in the <b>second layer</b> describe the main concepts and are used to include/exclude groups of keywords for each search (via check boxes). All keywords under the same second layer are shown with the same color in the graphic output.  Keywords in the <b>third layer</b> are shown in the results (both graphic and tabular).  Keywords in the <b>fourth layer</b> are used in PubMed and GWAS catalog search. These keywords will also be highlighted in the sentences. Results from all keywords in the fourth layer are grouped together and shown under their parent third layer keyword. This is useful to include synonyms and spelling variants in the fourth layer. A special second layer keyword is <font color="tomato"> <b> GWAS</b></font>. Any keyword under this branch is used to search the GWAS catalog. Similarly, third layer is used for display of the results and fourth layer is used for search. </p>
 
 {%if "name" in session %}
 	<b>{{session['name']}}</b>, your ontologies are available in the <a href="/ontoarchive"> archive </a>.
@@ -13,9 +13,14 @@
 {% endif %}
 
 {%if "email" in session %}
+<br>
+	The following ontologies are available:
 	<form action="/ontology">
-		<div id="onto_selection">The following ontologies are available:</div>
-		<button type="submit" class="btn btn-primary btn btn-info">Select</button>
+		<table><td>
+			<div id="onto_selection"></div>
+		</td><td>
+			<button type="submit" class="btn btn-primary btn btn-info">Select</button>
+		</td></table>
 	</form>
 {%else%}
 	Custom ontologies are available after <b>login</b>. 
@@ -47,12 +52,12 @@
 			</div>
 
 			<div id="div_id_secondcat" class="form-group required" style="width: 80%">
-				<label for="subcat"><b>Layer 3.</b> Keywords shown in results (e.g. <i> accumbens</i>) </label>
+				<label for="subcat"><b>Layer 3.</b> A keyword displayed in the results (e.g. <i> accumbens</i>) </label>
 				<input class="input-md  textinput textInput form-control" id="subcat" name="subcat" placeholder="subcategory" style="margin-bottom: 5%" required/>
 			</div>
 
 			<div id="div_id_thirdcat" class="form-group required">
-				<label for="keycat"><b>Layer 4.</b> Synonyms (e.g. <i>accumbal, AcbC, AcbS, NAcc <i> )  </label>
+				<label for="keycat"><b>Layer 4.</b> Keywords used for the search (Please include the word in Layer 3 and its variations, such as synonyms or alternative spellings, e.g. <i>accumbens, accumbal, AcbC, AcbS, NAcc <i> )  </label>
 				<textarea name="keycat" class="form-control form-control-lg" id="keycat" type="search" rows="4"  id="searchform" required></textarea>
 			</div>
 
@@ -63,24 +68,21 @@
 		</td>
 
 	<td style="width:45%; vertical-align:top">
-			<h3 style= "margin-top:5%; margin-left:5%">Ontology: {{namecat}}</h3>
-			<br>
+	<h3 style= "margin-top:5% ">Ontology: {{namecat}}</h3>
 			{%for ky in dict_onto.keys()%}
-				<p style="margin-left:10%">
-				<b>{{ky}}:</b> <p/style>
+			<hr style="width: 80%">
+			<ul><li>{{ky}} <!--layer2--> 
 				{%for subky in dict_onto[ky].keys()%}
-					<ul><li>{{subky}}
-					<br>
-					<p style="text-indent: 5%;"> {{(((dict_onto[ky][subky]|string()).split('|'))|string()).replace('\"{','').replace('}\"','').replace('\"','\'').replace('[','').replace(']','').replace('\'','')}} </p>
-					</ul><hr>
+					<ul><li>{{subky}}  <!-- layer 3 -->
+							<ul> <li>{{(((dict_onto[ky][subky]|string()).split('|'))|string()).replace('\"{','').replace('}\"','').replace('\"','\'').replace('[','').replace(']','').replace('\'','')}}  <!--layer4-->
+					</ul>
+					</ul>
 				{%endfor%}
+			</ul>
 			{%endfor%}
 	</td>
 </form>
 </table>
-
-
-
 
 {%if "name" in session %}
 <script>
@@ -95,8 +97,5 @@
 	document.getElementById('onto_selection').appendChild(newdiv);
   </script>
   {% endif %}
-
-
-
 
 {% endblock %}
