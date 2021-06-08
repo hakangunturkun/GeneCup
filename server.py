@@ -146,7 +146,6 @@ def login():
         else:
             flash("Invalid username or password!", "inval")
             return render_template('signup.html')
-    print(onto_list)
     return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto)
 
 
@@ -762,7 +761,7 @@ def search():
     if(len(genes)==1):
         percent_ratio=2
     timeextension=session['timeextension']
-    percent=round(100/percent_ratio,1)-1 # 7 categories + 1 at the beginning
+    percent=100/percent_ratio-0.00000001 # 7 categories + 1 at the beginning
 
     if ('email' in session):
         sessionpath = session['path_user'] + timeextension
@@ -918,7 +917,7 @@ def search():
                                             +str(row['MAPPED_TRAIT'])+"</b><br>"
                                         gwas_sent.append(gene+"\t"+"GWAS"+"\t"+nd+"_GWAS\t"+str(row['PUBMEDID'])+"\t"+gwas_text)
                     cys, gwas_json, sn_file = searchArchived('GWAS', gene , 'json',gwas_sent, path_user)
-                    with open(path_user+"gwas_results.tab", "w") as gwas_edges:
+                    with open(path_user+"gwas_results.tab", "a") as gwas_edges:
                         gwas_edges.write(sn_file)
                     geneEdges += cys
                     json_edges += gwas_json  
