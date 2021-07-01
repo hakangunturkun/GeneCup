@@ -851,6 +851,7 @@ def search():
             yield "data:"+str(progress)+"\n\n"
             for gene in genes:
                 abstracts_raw = getabstracts(gene,all_d)
+                #print(abstracts_raw)
                 sentences_ls=[]
 
                 for row in abstracts_raw.split("\n"):
@@ -890,10 +891,11 @@ def search():
                                 dict_onto=ast.literal_eval(onto_cont)
                                 #ky_d=undic(list(dict_onto[ky].values()))    
                                 sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
-                            
                             else:
                                 #ky_d=undic(list(dict_onto[ky].values()))
+                                #print(sentences_ls)
                                 sent=gene_category(gene,ky,str(ky), sentences_ls, addiction_flag,dict_onto)
+                                #print(sent)
                             yield "data:"+str(progress)+"\n\n"
                             
                             geneEdges += generate_edges(sent, tf_name)

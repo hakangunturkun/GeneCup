@@ -23,21 +23,10 @@ def findWholeWord(w):
     return re.compile(r'\b({0})\b'.format(w), flags=re.IGNORECASE).search
 
 def getabstracts(gene,query):
-    if query[-1] =='s':
-        query2 = query+"*"
-    else:
-        query2 = query+"s*"
-    query3 = query2.replace("s|", "s* OR ")
-    query4 = query3.replace("|", "s* OR ")
-    
-    #query4=query
-    #query="\"(" + query4 + ") AND ((" + gene + "[tiab]) or (" + gene + "[meSH]))\""
-    query="\"(" + query4 + ") AND (" + gene + " [tiab])\""
-    #query = "neurons* AND (penk [tiab])"
+    query="\"(" + query + ") AND (" + gene + " [tiab])\""
     abstracts = os.popen("esearch -db pubmed -query " +  query \
         + " | efetch -format uid |fetch-pubmed -path "+ pubmed_path \
         + " | xtract -pattern PubmedArticle -element MedlineCitation/PMID,ArticleTitle,AbstractText|sed \"s/-/ /g\"").read()
-    #print(abstracts)
     return(abstracts)
 
 sentences_ls=[]
@@ -57,6 +46,7 @@ def getSentences(gene, sentences_ls):
 def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
     # e.g. BDNF, addiction_d, undic(addiction_d) "addiction"
     sents=getSentences(gene, abstracts)
+    #print(sents)
     #print(abstracts)
     out=str()
     if (addiction_flag==1):
@@ -66,7 +56,12 @@ def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
                     key_ad = key+"*"
                 else:
                     key_ad = key+"s*"
-                if findWholeWord(key_ad)(sent) :
+                key_ad = key_ad.replace("s|", "s*|")
+                key_ad = key_ad.replace("|", "s*|")
+                key_ad = key_ad.replace("s*s*", "s*")
+                #if findWholeWord(key_ad)(sent) :
+                re_find = re.compile(r'\b{}\b'.format(key_ad), re.IGNORECASE)
+                if re_find.findall(sent):
                     sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
                     sent=re.sub(r'\b(%s)\b' % key_ad, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
                     out+=gene+"\t"+ cat + "\t"+key+"\t"+sent+"\n"
@@ -77,11 +72,17 @@ def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
                     key_2 = key_2+"*"
                 else:
                     key_2 = key_2+"s*"
+                key_2 = key_2.replace("s|", "s*|")
+                key_2 = key_2.replace("|", "s*|")
+                key_2 = key_2.replace("s*s*", "s*")
                 for sent in sents.split("\n"):
-                    if findWholeWord(key_2)(sent) :
+                    re_find = re.compile(r'\b{}\b'.format(key_2), re.IGNORECASE)
+                    #if findWholeWord(key_2)(sent) :
+                    #if re.compile(r'\b(%s)\b' %key_2,sent, re.IGNORECASE):
+                    if re_find.findall(sent):
                         sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
                         sent=re.sub(r'\b(%s)\b' % key_2, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
-                        out+=gene+"\t"+ cat + "\t"+key_1+"\t"+sent+"\n"
+                        out+=gene+"\t"+ cat + "\t"+key_1+"\t"+sent+"\n"                       
     return(out)
 
 def generate_nodes(nodes_d, nodetype,nodecolor):
@@ -134,7 +135,6 @@ def generate_edges_json(data, filename):
             elif (edgeID not in edgeCnts) and (pmid+target not in pmid_list):
                 edgeCnts[edgeID]=1
                 pmid_list.append(pmid+target)
-
     for edgeID in edgeCnts:
         (filename, source,target)=edgeID.split("|")
         edges_json0+="{ \"id\": \"" + edgeID + "\", \"source\": \"" + source + "\", \"target\": \"" + target + "\", \"sentCnt\": \"" + str(edgeCnts[edgeID]) + "\",  \"url\":\"/sentences?edgeID=" + edgeID + "\" },\n"
