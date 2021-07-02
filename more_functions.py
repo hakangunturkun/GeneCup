@@ -59,12 +59,13 @@ def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
                 key_ad = key_ad.replace("s|", "s*|")
                 key_ad = key_ad.replace("|", "s*|")
                 key_ad = key_ad.replace("s*s*", "s*")
-                #if findWholeWord(key_ad)(sent) :
-                re_find = re.compile(r'\b{}\b'.format(key_ad), re.IGNORECASE)
-                if re_find.findall(sent):
-                    sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
-                    sent=re.sub(r'\b(%s)\b' % key_ad, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
-                    out+=gene+"\t"+ cat + "\t"+key+"\t"+sent+"\n"
+                key_ad_ls = key_ad.split('|')
+                for key_ad in key_ad_ls:
+                    re_find = re.compile(r'\b{}\b'.format(key_ad), re.IGNORECASE)
+                    if re_find.findall(sent):
+                        sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
+                        sent=re.sub(r'\b(%s)\b' % key_ad, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
+                        out+=gene+"\t"+ cat + "\t"+key+"\t"+sent+"\n"
     else:
         for key_1 in dictn[cat_d].keys():
             for key_2 in dictn[cat_d][key_1]:
@@ -75,14 +76,14 @@ def gene_category(gene, cat_d, cat, abstracts,addiction_flag,dictn):
                 key_2 = key_2.replace("s|", "s*|")
                 key_2 = key_2.replace("|", "s*|")
                 key_2 = key_2.replace("s*s*", "s*")
+                key_2_ls = key_2.split('|')
                 for sent in sents.split("\n"):
-                    re_find = re.compile(r'\b{}\b'.format(key_2), re.IGNORECASE)
-                    #if findWholeWord(key_2)(sent) :
-                    #if re.compile(r'\b(%s)\b' %key_2,sent, re.IGNORECASE):
-                    if re_find.findall(sent):
-                        sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
-                        sent=re.sub(r'\b(%s)\b' % key_2, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
-                        out+=gene+"\t"+ cat + "\t"+key_1+"\t"+sent+"\n"                       
+                    for key_2 in key_2_ls:
+                        re_find = re.compile(r'\b{}\b'.format(key_2), re.IGNORECASE)
+                        if re_find.findall(sent):
+                            sent=sent.replace("<b>","").replace("</b>","") # remove other highlights
+                            sent=re.sub(r'\b(%s)\b' % key_2, r'<b>\1</b>', sent, flags=re.I) # highlight keyword
+                            out+=gene+"\t"+ cat + "\t"+key_1+"\t"+sent+"\n"                       
     return(out)
 
 def generate_nodes(nodes_d, nodetype,nodecolor):
