@@ -569,7 +569,11 @@ def ontoarchive():
     if ('email' in session):
         if os.path.exists(datadir+"/user/"+str(session['hashed_email'])+"/ontology") == False:
             flash("Ontology history doesn't exist!")
-            return render_template('index.html',onto_len_dir=session['onto_len_dir'], onto_list=session['onto_list'])
+            onto_len_dir = 0
+            onto_list = ''
+            onto_cont=open("addiction.onto","r").read()
+            dict_onto=ast.literal_eval(onto_cont)
+            return render_template('index.html',onto_len_dir=onto_len_dir, onto_list=onto_list, ontol = 'addiction', dict_onto = dict_onto) 
         else:
             session['user_folder'] = datadir+"/user/"+str(session['hashed_email'])
     else:
