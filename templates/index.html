@@ -27,10 +27,13 @@
 
 			<form action="/progress">
 				<div id="check_selection"></div>
-					Up to 200 gene symbols can be entered in the box below. Gene symbols can be separated by a space, a comma or a semicolon. <br>	
 				<textarea name="query" class="form-control form-control-lg" type="search" rows="4" e="100%" id="searchform"></textarea>
+
+				Up to 200 gene symbols</span> can be entered in the box above. Because we do not search for relationships between genes, a list with more items can be split into multiple searches without affecting the results. Gene symbols can be separated by a space, a comma or a semicolon. <br>	
+
 				<button type="submit" class="btn btn-primary">Search</button>
 			</form>
+
 
 		{% else %}	
 			Welcome back, <b> {{session['name']}}</b>. Your <a href="/userarchive"> previous searches </a> 
