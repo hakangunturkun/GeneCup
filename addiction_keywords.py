@@ -5,6 +5,7 @@ addiction_d={'addiction':'addiction|addictive|compulsive|drug abuse|escalation|p
 'relapse':'craving|drug seeking|reinstatement|relapse|seeking',
 'reward':'conditioned place preference|CPP|drug reinforced|hedonic|ICSS|incentive|instrumental response|intracranial self stimulation|operant|reinforcement|reinforcing|reward|self administered|self administration',
 'sensitization':'behavioral sensitization|locomotor sensitization|drug sensitization|incentive sensitization',
+'social':'social',
 'withdrawal':'withdrawal'}
 
 brain_d={'accumbens':'acbc|acbs|accumbal|accumbens|core|Nacc|NacSh|shell',
