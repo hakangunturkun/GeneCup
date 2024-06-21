@@ -1,47 +1,44 @@
 #!/bin/env  python3
 from __future__ import print_function
-from flask import Flask, render_template, request, session, Response, redirect, url_for, flash
-from flask_sqlalchemy import SQLAlchemy
-from flask import jsonify
 
-import json
-import shutil
-import bcrypt
 import hashlib
-import tempfile
-import random
-import string
-import re
-import pytz
+import json
 import os
+import random
+import re
+import shutil
+import string
+import tempfile
 from os import listdir
-import pandas as pd
+
+import bcrypt
+import nltk
 import numpy as np
+import pandas as pd
+import pytz
+from flask import (Flask, Response, flash, jsonify, redirect, render_template,
+                   request, session, url_for)
+from flask_sqlalchemy import SQLAlchemy
 from numpy import array
 
-import nltk
 nltk.download('punkt')
-from nltk.corpus import stopwords
-from nltk.stem.porter import PorterStemmer
-
+import pickle
 from collections import Counter
 from datetime import datetime
-from more_functions import *
 
 import tensorflow
 import tensorflow.keras
-from tensorflow.keras.models import Model
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.layers import *
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import Flatten
-from tensorflow.keras.layers import Embedding
-from tensorflow.keras import metrics
-from tensorflow.keras import optimizers
+from nltk.corpus import stopwords
+from nltk.stem.porter import PorterStemmer
 from tensorflow.keras import backend as K
-import pickle
+from tensorflow.keras import metrics, optimizers
+from tensorflow.keras.layers import *
+from tensorflow.keras.layers import Dense, Embedding, Flatten
+from tensorflow.keras.models import Model, Sequential
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.preprocessing.text import Tokenizer
+
+from more_functions import *
 
 app=Flask(__name__)
 #datadir="/export/ratspub/"
@@ -907,8 +904,10 @@ def search():
                         sentences+=sent
                 if ("GWAS" in search_type):
                     gwas_sent=[]
-                    datf_sub1 = datf[datf['REPORTED GENE(S)'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE)
-                                    | (datf['MAPPED_GENE'].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE))]
+                    print (datf)
+                    datf_sub1 = datf[datf["MAPPED_GENE"].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE)
+                                    | (datf["REPORTED GENE(S)"].str.contains('(?:\s|^)'+gene+'(?:\s|$)', flags=re.IGNORECASE))]
+                    print (datf_sub1)
                     for nd2 in dict_onto['GWAS'].keys():
                         for nd1 in dict_onto['GWAS'][nd2]:    
                             for nd in nd1.split('|'):
